@@ -1,0 +1,239 @@
+:root {
+  --bg-color: #0f172a;
+  --surface-main: #1e293b;
+  --surface-board: #064e3b; /* A luxury green felt */
+  --text-color: #f8fafc;
+  --accent-color: #ef4444; /* Alert / Doubt red */
+  --gold-accent: #f59e0b;
+  
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 15px rgba(239, 68, 68, 0.5);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  overflow: hidden; /* Avoid scroll on game board */
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.top-bar {
+  padding: 1rem;
+  background: var(--surface-main);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+.board-area {
+  flex: 1;
+  background: radial-gradient(circle at center, #059669 0%, #064e3b 100%);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.player-area {
+  padding: 1rem;
+  background: var(--surface-main);
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  position: relative;
+}
+
+/* Card Styling */
+.card-wrapper {
+  width: 80px;
+  height: 120px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  color: #1e293b;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+  font-weight: bold;
+}
+
+.card-wrapper:hover {
+  transform: translateY(-10px);
+}
+
+.card-value {
+  font-size: 1.5rem;
+  padding: 4px 8px;
+}
+
+.card-suit {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 2rem;
+}
+
+.card-denari { color: #f59e0b; }
+.card-coppe { color: #ef4444; }
+.card-spade { color: #3b82f6; }
+.card-bastoni { color: #10b981; }
+
+.card-back {
+  background: linear-gradient(135deg, #1e3a8a 25%, transparent 25%) -20px 0,
+              linear-gradient(225deg, #1e3a8a 25%, transparent 25%) -20px 0,
+              linear-gradient(315deg, #1e3a8a 25%, transparent 25%),
+              linear-gradient(45deg, #1e3a8a 25%, transparent 25%);
+  background-size: 40px 40px;
+  background-color: #1e40af;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 4px solid white;
+  box-sizing: border-box;
+}
+
+/* Selected state */
+.card-selected {
+  outline: 3px solid var(--gold-accent);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+  transform: translateY(-15px) !important;
+}
+
+.card-opponent-target {
+  outline: 3px solid var(--accent-color);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+  transform: translateY(-15px) !important;
+}
+
+.hand-flex {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.table-flex {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 800px;
+}
+
+/* Challenge Overlay */
+.challenge-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  animation: fadeIn 0.3s ease;
+}
+
+.challenge-box {
+  background: var(--surface-main);
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.challenge-title {
+  color: var(--accent-color);
+  font-size: 2rem;
+  margin-top: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 900;
+}
+
+.btn {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  margin: 0 10px;
+}
+
+.btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.btn-danger {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  box-shadow: var(--shadow-glow);
+}
+
+.timer-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  margin: 20px 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.timer-fill {
+  height: 100%;
+  background: var(--accent-color);
+  width: 100%;
+  transform-origin: left;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Played Card Area */
+.pending-move-area {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
