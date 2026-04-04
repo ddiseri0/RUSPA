@@ -1,5 +1,5 @@
 import { useReducer, useEffect } from 'react';
-import { GameState, Card, Move, Phase } from '../engine/types';
+import { GameState, Card, Move } from '../engine/types';
 import { createDeck, shuffle, isValidCapture, isValidRuspa } from '../engine/GameLogic';
 
 export type GameAction =

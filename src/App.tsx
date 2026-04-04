@@ -1,51 +1,62 @@
-import { useEffect, useState } from 'react';
-import { useGame } from './hooks/useGame';
+import { useState } from 'react';
+import { useMultiplayerGame } from './hooks/useMultiplayerGame';
 import { Card as CardType } from './engine/types';
 import { Card } from './components/Card';
-import { getBotMove, shouldBotDoubt } from './engine/Bot';
-import { calculateRoundScore } from './engine/GameLogic';
 
 function App() {
-  const { state, dispatch } = useGame();
+  const { state, error, playerId, joinRoom, submitMove, dubito } = useMultiplayerGame();
+  
   const [selectedHandCard, setSelectedHandCard] = useState<CardType | null>(null);
   const [selectedTableCards, setSelectedTableCards] = useState<CardType[]>([]);
+  
+  const [lobbyName, setLobbyName] = useState('');
+  const [lobbyRoom, setLobbyRoom] = useState('');
 
-  const player = state.players['player_1'];
-  const bot = state.players['bot_1'];
-
-  let finalScore = null;
-  if (state.phase === 'GAME_OVER') {
-     finalScore = calculateRoundScore(player.captured, bot.captured, player.scopa, bot.scopa);
+  if (!state) {
+    return (
+      <div className="game-container" style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', height: '100vh'}}>
+        <h1 style={{color: 'var(--gold-accent)', fontSize: '3rem', margin: 0}}>RUSPA.IO</h1>
+        <div style={{background: 'rgba(0,0,0,0.5)', padding: '30px', borderRadius: '15px', display: 'flex', flexDirection: 'column', gap: '15px', width: '300px'}}>
+          {error && <div style={{color: 'red', fontWeight: 'bold'}}>{error}</div>}
+          <input 
+            placeholder="Il tuo nome (es. Mario)" 
+            value={lobbyName} 
+            onChange={e => setLobbyName(e.target.value)} 
+            style={{padding: '10px', fontSize: '1.2rem', borderRadius: '5px', border: 'none'}}
+          />
+          <input 
+            placeholder="Codice Stanza (es. 1234)" 
+            value={lobbyRoom} 
+            onChange={e => setLobbyRoom(e.target.value.toUpperCase())} 
+            maxLength={4}
+            style={{padding: '10px', fontSize: '1.2rem', borderRadius: '5px', border: 'none', letterSpacing: '5px', textAlign: 'center'}}
+          />
+          <button 
+            className="btn btn-danger" 
+            style={{fontSize: '1.2rem', padding: '15px'}} 
+            onClick={() => joinRoom(lobbyRoom, lobbyName)}
+            disabled={!lobbyName || lobbyRoom.length < 4}
+          >
+            ENTRA IN LOBBY
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  // Gestione Turno Bot
-  useEffect(() => {
-    if (state.phase === 'PLAYER_MOVE' && state.currentTurn === 'bot_1') {
-      const wait = setTimeout(() => {
-        const move = getBotMove(state);
-        if (move) {
-            const playedCard = bot.hand.find(c => c.id === move.cardId)!;
-            const targetCards = move.targetIds.map(id => state.board.find(c => c.id === id)!);
-            dispatch({ type: 'SUBMIT_MOVE', playerId: 'bot_1', playedCard, targetCards, isRuspa: false });
-        }
-      }, 1500);
-      return () => clearTimeout(wait);
-    }
-  }, [state.phase, state.currentTurn, state, dispatch, bot]);
+  const me = state.players[playerId || ''];
+  // Trova l'avversario escludendo me
+  const opponentId = Object.keys(state.players).find(id => id !== playerId);
+  const opponent = opponentId ? state.players[opponentId] : null;
 
-  // Gestione IA che dubita
-  useEffect(() => {
-    if (state.phase === 'CHALLENGE_WINDOW' && state.pendingMove?.playerId === 'player_1') {
-      const wait = setTimeout(() => {
-          if (shouldBotDoubt(state)) {
-              dispatch({ type: 'DOUBT' });
-          } else {
-              dispatch({ type: 'ACCEPT' });
-          }
-      }, 2000);
-      return () => clearTimeout(wait);
-    }
-  }, [state.phase, state.pendingMove, state, dispatch]);
+  if (state.phase === 'IDLE' && Object.keys(state.players).length < 2) {
+      return (
+         <div className="game-container" style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh'}}>
+           <h2>Stanza: {state.roomId}</h2>
+           <p style={{fontSize: '1.5rem', color: 'var(--gold-accent)'}}>In attesa che un altro giocatore si unisca...</p>
+         </div>
+      );
+  }
 
   const toggleTableCard = (c: CardType) => {
     if (selectedTableCards.find(sc => sc.id === c.id)) {
@@ -57,37 +68,40 @@ function App() {
 
   const handlePlayNormal = () => {
     if (!selectedHandCard) return;
-    dispatch({
-      type: 'SUBMIT_MOVE',
-      playerId: 'player_1',
-      playedCard: selectedHandCard,
-      targetCards: selectedTableCards,
-      isRuspa: false
-    });
+    submitMove(selectedHandCard, selectedTableCards, false);
     setSelectedHandCard(null);
     setSelectedTableCards([]);
   };
 
   const handleRuspa = () => {
      if (!selectedHandCard) return;
-     dispatch({
-        type: 'SUBMIT_MOVE',
-        playerId: 'player_1',
-        playedCard: selectedHandCard,
-        targetCards: state.board, // Prende tutto
-        isRuspa: true
-      });
-      setSelectedHandCard(null);
-      setSelectedTableCards([]);
+     submitMove(selectedHandCard, state.board, true);
+     setSelectedHandCard(null);
+     setSelectedTableCards([]);
   }
 
+  const opponentHiddenCards = [];
+  if (opponent) {
+      for (let i=0; i<opponent.handCount; i++) {
+         opponentHiddenCards.push({ id: `hidden-${i}`, suit: 'denari', value: 0 } as any);
+      }
+  }
 
   return (
     <div className="game-container">
       <div className="top-bar">
-        <div>🤖 Bot AI: {bot?.scopa} Scopa | Prese: {bot?.captured.length}</div>
+        <div>👤 {opponent?.name || 'Avversario'}: {opponent?.scopa || 0} Scopa | Prese: {opponent?.capturedCount || 0}</div>
         <div style={{fontWeight: '900', color: 'var(--gold-accent)', fontSize:'1.2rem', textTransform: 'uppercase'}}>{state.lastActionMessage}</div>
-        <div>Dom: {player?.scopa} Scopa | Prese: {player?.captured.length}</div>
+        <div>👤 {me?.name || 'Tu'}: {me?.scopa || 0} Scopa | Prese: {me?.capturedCount || 0}</div>
+      </div>
+
+      <div className="player-area" style={{opacity: state.currentTurn === opponentId ? 1 : 0.5}}>
+        <h3 style={{margin:'0 0 10px 0'}}>{opponent?.name || 'In attesa...'}</h3>
+        <div className="hand-flex" style={{transform: 'scale(0.8)'}}>
+          {opponentHiddenCards.map(c => (
+             <Card key={c.id} card={c} hidden={true} isSelected={false} onClick={() => {}} />
+          ))}
+        </div>
       </div>
       
       <div className="board-area">
@@ -95,8 +109,8 @@ function App() {
           {state.board.map(c => {
             const isSelectedByPlayer = !!selectedTableCards.find(sc => sc.id === c.id);
             const isTargetedByOp = state.phase === 'CHALLENGE_WINDOW' && 
-                                   state.pendingMove?.playerId === 'bot_1' && 
-                                   (!!state.pendingMove.targetCards.find(tc => tc.id === c.id) || state.pendingMove.isRuspa);
+                                   state.pendingMove?.playerId === opponentId && 
+                                   (!!state.pendingMove?.targetCards.find(tc => tc.id === c.id) || state.pendingMove?.isRuspa);
             return (
               <Card 
                 key={c.id} 
@@ -110,16 +124,16 @@ function App() {
         </div>
         
         {state.pendingMove && (
-            <div className={`pending-move-area ${state.phase === 'IDLE' ? 'shake' : ''}`}>
-                <Card card={state.pendingMove.playedCard} hidden={state.phase === 'CHALLENGE_WINDOW' /* only hide if unresolved */} />
+            <div className={`pending-move-area`}>
+                <Card card={state.pendingMove.playedCard} hidden={state.pendingMove?.playedCard?.id === 'hidden' && state.phase === 'CHALLENGE_WINDOW'} />
             </div>
         )}
       </div>
 
-      <div className="player-area">
-        <h3 style={{margin:'0 0 10px 0'}}>{state.currentTurn === 'player_1' ? "Tocca a te" : "Attendi il turno del bot..."}</h3>
+      <div className="player-area" style={{opacity: state.currentTurn === playerId ? 1 : 0.5}}>
+        <h3 style={{margin:'0 0 10px 0'}}>{state.currentTurn === playerId ? "Tocca a te" : `Attendi il turno di ${opponent?.name}...`}</h3>
         <div className="hand-flex">
-          {player?.hand.map(c => (
+          {me?.hand?.map(c => (
              <Card 
               key={c.id} 
               card={c} 
@@ -129,7 +143,7 @@ function App() {
           ))}
         </div>
         
-        {state.currentTurn === 'player_1' && state.phase === 'PLAYER_MOVE' && selectedHandCard && (
+        {state.currentTurn === playerId && state.phase === 'PLAYER_MOVE' && selectedHandCard && (
             <div style={{marginTop: '15px'}}>
                <button className="btn btn-danger" onClick={handleRuspa}>Dichiara RUSPA ✨</button>
                <button className="btn" onClick={handlePlayNormal}>Calata (Normale)</button>
@@ -137,47 +151,40 @@ function App() {
         )}
       </div>
       
-      {state.phase === 'CHALLENGE_WINDOW' && state.pendingMove?.playerId === 'bot_1' && (
+      {state.phase === 'CHALLENGE_WINDOW' && state.pendingMove?.playerId !== playerId && (
       <div className="challenge-overlay">
         <div className="challenge-box">
           <h2 className="challenge-title">DUBITO!</h2>
-          {state.pendingMove.isRuspa ? (
-              <p style={{fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--gold-accent)'}}>L'IA dichiara RUSPA! Vuole prendere TUTTO il tavolo.</p>
-          ) : state.pendingMove.targetCards.length > 0 ? (
-              <p>L'IA vuole prendere: <strong>{state.pendingMove.targetCards.map(c => `${c.value === 1 ? 'A' : c.value}${c.suit === 'denari' ? '🪙' : c.suit === 'coppe' ? '🏆' : c.suit === 'spade' ? '⚔️' : '🪵'}`).join(', ')}</strong></p>
+          {state.pendingMove?.isRuspa ? (
+              <p style={{fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--gold-accent)'}}>{opponent?.name} dichiara RUSPA! Vuole prendere TUTTO il tavolo.</p>
+          ) : state.pendingMove?.targetCards && state.pendingMove.targetCards.length > 0 ? (
+              <p>{opponent?.name} sta prendendo quelle evidenziate.</p>
           ) : (
-              <p>L'IA sta scartando una carta sul tavolo.</p>
+              <p>{opponent?.name} sta scartando una carta sul tavolo.</p>
           )}
-          <div className="timer-bar"><div className="timer-fill" style={{animation: 'shrink 3s linear forwards'}}></div></div>
-          {state.pendingMove.targetCards.length > 0 && (
-             <button className="btn btn-danger" onClick={() => dispatch({type: 'DOUBT'})}>DUBITO!</button>
+          <div className="timer-bar"><div className="timer-fill" style={{animation: 'shrink 5s linear forwards'}}></div></div>
+          {state.pendingMove?.targetCards && state.pendingMove.targetCards.length > 0 && (
+             <button className="btn btn-danger" onClick={dubito}>DUBITO!</button>
           )}
-          <button className="btn" onClick={() => dispatch({type: 'ACCEPT'})}>LASCIA PASSARE</button>
+          <p style={{fontSize: '0.8rem', marginTop: '10px'}}>Se non fai nulla, la mossa passa.</p>
         </div>
       </div> 
       )}
 
-      {state.phase === 'GAME_OVER' && finalScore && (
+      {state.phase === 'GAME_OVER' && (
       <div className="challenge-overlay">
         <div className="challenge-box" style={{width: '400px'}}>
           <h2 className="challenge-title">PARTITA FINITA</h2>
-          
           <div style={{margin: '20px 0', textAlign: 'left', background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '8px'}}>
              <div style={{display:'flex', justifyContent: 'space-between', borderBottom: '1px solid #444', marginBottom:'10px', paddingBottom:'5px'}}>
-               <span style={{fontWeight:'bold'}}>Punti Scopa Fatti:</span> <span>Tu: {player.scopa} | Bot: {bot.scopa}</span>
+               <span style={{fontWeight:'bold'}}>Punti Scopa Fatti:</span> <span>Tu: {me?.scopa} | {opponent?.name}: {opponent?.scopa}</span>
              </div>
-             
-             <div style={{display:'flex', justifyContent: 'space-between'}}><span>🏆 Carte:</span> <span>{finalScore.details.carte}</span></div>
-             <div style={{display:'flex', justifyContent: 'space-between'}}><span>💰 Denari:</span> <span>{finalScore.details.denari}</span></div>
-             <div style={{display:'flex', justifyContent: 'space-between'}}><span>🃏 Settebello:</span> <span>{finalScore.details.settebello}</span></div>
-             <div style={{display:'flex', justifyContent: 'space-between'}}><span>👑 Primiera:</span> <span>{finalScore.details.primiera}</span></div>
              
              <div style={{display:'flex', justifyContent: 'space-between', borderTop: '2px solid var(--accent-color)', marginTop:'10px', paddingTop:'10px', fontSize:'1.2rem', fontWeight:'bold', color:'var(--gold-accent)'}}>
-               <span>TOTALE:</span> <span>Tu: {finalScore.player1Points} - Bot: {finalScore.botPoints}</span>
+               Fine della partita! Controllate lo status globale sul server.
              </div>
           </div>
-          
-          <button className="btn btn-danger" onClick={() => dispatch({type: 'START_GAME'})}>Nuova Partita</button>
+          <button className="btn" onClick={() => window.location.reload()}>Esci in Lobby</button>
         </div>
       </div> 
       )}

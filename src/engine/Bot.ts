@@ -1,5 +1,5 @@
-import { GameState, Move, Card } from './types';
-import { isValidCapture, isValidRuspa } from './GameLogic';
+import { GameState } from './types';
+import { isValidCapture } from './GameLogic';
 
 export function getBotMove(state: GameState): { cardId: string, targetIds: string[], isRuspa: boolean } | null {
   const bot = state.players['bot_1'];

@@ -3,7 +3,7 @@ import { Server, Socket } from 'socket.io';
 import type { GameState, ClientGameState, Move } from '../src/engine/types';
 import { createDeck, shuffle, isValidCapture, isValidRuspa } from '../src/engine/GameLogic';
 
-const httpServer = createServer((req, res) => {
+const httpServer = createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Ruspa Socket Server works.');
 });
