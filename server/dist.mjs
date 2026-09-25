@@ -37,7 +37,7 @@ function isValidRuspa(playedValue, targetCount, boardCount) {
 }
 
 // server/index.ts
-var httpServer = createServer((req, res) => {
+var httpServer = createServer((_req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("Ruspa Socket Server works.");
 });
