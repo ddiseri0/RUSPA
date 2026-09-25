@@ -25,7 +25,17 @@ export interface PlayerState {
   scopa: number;
 }
 
+export interface ClientPlayerState {
+  id: string;
+  name: string;
+  handCount: number;
+  hand?: Card[]; // Only populated for the user's own state
+  capturedCount: number;
+  scopa: number;
+}
+
 export interface GameState {
+  roomId?: string;
   board: Card[];
   players: Record<string, PlayerState>;
   turnOrder: string[]; 
@@ -34,5 +44,18 @@ export interface GameState {
   pendingMove: Move | null;
   lastActionMessage: string;
   deck: Card[];
+  lastCaptureBy: string | null;
+}
+
+export interface ClientGameState {
+  roomId: string;
+  board: Card[];
+  players: Record<string, ClientPlayerState>;
+  turnOrder: string[]; 
+  currentTurn: string;
+  phase: Phase;
+  pendingMove: Move | null; // For opponents, playedCard might be a hidden placeholer like {id:'hidden', suit:'denari', value:0}
+  lastActionMessage: string;
+  deckCount: number;
   lastCaptureBy: string | null;
 }
