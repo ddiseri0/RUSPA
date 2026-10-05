@@ -20,7 +20,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
   mode,
   onVote,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(7);
+  const [timeLeft, setTimeLeft] = useState(5);
   const mover = players[dubitoState.initiatorId];
   const user = players[currentUserId];
   const isOpponent = user && user.team === dubitoState.targetTeam;
@@ -56,7 +56,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-zinc-800">
           <div
             className="h-full bg-rose-500 transition-all duration-300 ease-linear"
-            style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 7) * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 5) * 100))}%` }}
           />
         </div>
 

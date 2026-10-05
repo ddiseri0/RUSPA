@@ -45,7 +45,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   // If already in a room lobby, show room details & waiting slots
   if (currentRoom && currentRoom.phase === 'LOBBY') {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-between p-6 sm:p-10 select-none">
+      <div className="h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] bg-black text-white flex flex-col items-center justify-between p-4 sm:p-8 select-none overflow-hidden">
         {/* Top Header */}
         <div className="w-full max-w-2xl flex items-center justify-between border-b border-zinc-900 pb-4">
           <div className="flex items-center gap-3">
@@ -149,7 +149,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   // Initial Screen: Choose Mode & Create / Join Room
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-between p-6 sm:p-10 select-none">
+    <div className="h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] bg-black text-white flex flex-col items-center justify-between p-4 sm:p-8 select-none overflow-hidden">
       {/* Top Brand Bar */}
       <div className="w-full max-w-xl flex items-center justify-between border-b border-zinc-900 pb-4">
         <div className="flex items-center gap-3">

@@ -5,6 +5,7 @@ import { CardBack } from './CardBack';
 import { PlayerAvatar } from './PlayerAvatar';
 import { ScoreBoard } from './ScoreBoard';
 import { DubitoModal } from './DubitoModal';
+import { getCardLabel } from '../engine/scopaRules';
 
 interface GameBoardProps {
   room: RoomState;
@@ -27,7 +28,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   if (!room || !room.players || !room.players[currentUserId]) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+      <div className="h-[100dvh] w-[100vw] bg-black flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full border-2 border-white border-t-transparent animate-spin" />
           <span className="text-xs uppercase tracking-widest text-zinc-500">
@@ -60,7 +61,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (!selectedHandCard || !isMyTurn) return;
 
     if (isRuspaActive) {
-      // Requirement 3: L'Asso funge SEMPRE da Ruspa (pulisce il tavolo) ed è coperto in automatico.
+      // L'Asso funge SEMPRE da Ruspa (pulisce il tavolo) ed è coperto in automatico.
       // O Bluff Ruspa: Carta diversa dall'Asso con toggle attivo.
       const move: Move = {
         playerId: currentUserId,
@@ -73,7 +74,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       };
       onPlayMove(move);
     } else if (selectedBoardCards.length > 0) {
-      // Requirement 2: Presa Normale (coperta con Dubito)
+      // Priorità Presa Singola (Regola Ufficiale):
+      // Se la carta giocata corrisponde sia a una singola carta sul tavolo sia alla somma di più carte,
+      // il motore DEVE obbligare la presa della carta singola.
+      const cartaSingolaPresente = room.board.some((c) => c.value === selectedHandCard.value);
+      if (cartaSingolaPresente && selectedBoardCards.length > 1) {
+        alert(
+          `Regola Ufficiale: È presente a terra una carta di valore ${selectedHandCard.value} (${getCardLabel(
+            selectedHandCard.value
+          )}). La presa della carta singola è obbligatoria rispetto alla somma!`
+        );
+        return;
+      }
+
+      // Presa Normale (coperta con Dubito)
       const move: Move = {
         playerId: currentUserId,
         playerName: currentUser?.name || 'Giocatore',
@@ -110,7 +124,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const otherPlayers = Object.values(room.players).filter((p) => p.id !== currentUserId);
 
   return (
-    <div className="h-screen max-h-screen bg-black text-white flex flex-col justify-between p-3 sm:p-5 pb-5 select-none relative overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] bg-black text-white flex flex-col justify-between p-2 sm:p-4 pb-3 sm:pb-5 select-none relative overflow-hidden">
       {/* Top Bar: Room Code & Scoreboard */}
       <header className="w-full flex flex-col gap-3">
         <div className="flex items-center justify-between px-2">

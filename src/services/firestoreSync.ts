@@ -13,8 +13,7 @@ import {
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { RoomState, Player, Move, GameMode, Card, DubitoState } from '../types/game';
 import {
-  createStandardDeck,
-  shuffleDeck,
+  preparaDistribuzioneIniziale,
   verifyCaptureLegitimacy,
   evaluateManchePoints,
   getCardLabel,
@@ -424,11 +423,8 @@ export function subscribeToRoom(
  * Remaining cards stay in deck to be dealt in batches of 3 when hands are empty.
  */
 export async function startMatch(roomId: string, currentRoom: RoomState): Promise<void> {
-  const fullDeck = shuffleDeck(createStandardDeck());
+  const { mazzo: fullDeck, tavolo: board } = preparaDistribuzioneIniziale();
   const playerIds = Object.keys(currentRoom.players);
-
-  // 4 cards on the table
-  const board = fullDeck.splice(0, 4);
 
   // Distribute 3 cards to each player
   const privateHands: Record<string, Card[]> = {};
@@ -540,7 +536,7 @@ export async function submitCoveredMove(
     initiatorId: move.playerId,
     targetTeam,
     votes: {},
-    expiresAt: Date.now() + 7000, // 7 seconds countdown window for Dubito
+    expiresAt: Date.now() + 5000, // 5 secondi di finestra per il Dubito
     status: 'PENDING',
   };
 
@@ -635,7 +631,8 @@ export async function resolveDubitoChallenge(
     pendingMove.playedCard,
     targetCards,
     pendingMove.isRuspa,
-    currentRoom.board.length
+    currentRoom.board.length,
+    currentRoom.board
   );
 
   let newBoard = [...currentRoom.board];
@@ -729,14 +726,13 @@ export async function resolvePassMove(roomId: string, currentRoom: RoomState): P
       ...(updatedCapturedPiles[moverId] || []),
       ...allCapturedCards,
     ];
+    // REGOLE LA RUSPA: L'Asso Ruspa prende tutto il tavolo ma NON assegna MAI punto di Scopa!
     updatedPlayers[moverId] = {
       ...player,
-      score: player.score + 1,
-      scopaCount: player.scopaCount + 1,
       capturedCount: player.capturedCount + allCapturedCards.length,
     };
     newBoard = [];
-    actionMessage = `✨ RUSPA COMPLETATA! ${player.name} pulisce il tavolo senza dubbi (+1 Scopa)!`;
+    actionMessage = `✨ RUSPA COMPLETATA! ${player.name} pulisce l'intero tavolo (nessun punto Scopa per la Ruspa).`;
   } else if (pendingMove.targetCardIds.length > 0) {
     captureOccurred = true;
     const targetCards = newBoard.filter((c) => pendingMove.targetCardIds.includes(c.id));
@@ -748,14 +744,27 @@ export async function resolvePassMove(roomId: string, currentRoom: RoomState): P
       ...allCapturedCards,
     ];
 
+    // Verifica se è l'ultima mano/giocata del mazzo da 40 carte (non è scopa)
+    const isLastPlayOfDeck =
+      (currentRoom.deckRemaining === 0 || !currentRoom.deck || currentRoom.deck.length === 0) &&
+      Object.values(updatedPlayers).every((p) => p.handCount === 0);
+
     if (newBoard.length === 0) {
-      updatedPlayers[moverId] = {
-        ...player,
-        score: player.score + 1,
-        scopaCount: player.scopaCount + 1,
-        capturedCount: player.capturedCount + allCapturedCards.length,
-      };
-      actionMessage = `✨ SCOPA! ${player.name} ha svuotato il tavolo (+1 Scopa)!`;
+      if (!isLastPlayOfDeck) {
+        updatedPlayers[moverId] = {
+          ...player,
+          score: player.score + 1,
+          scopaCount: player.scopaCount + 1,
+          capturedCount: player.capturedCount + allCapturedCards.length,
+        };
+        actionMessage = `✨ SCOPA! ${player.name} ha svuotato il tavolo (+1 Scopa)!`;
+      } else {
+        updatedPlayers[moverId] = {
+          ...player,
+          capturedCount: player.capturedCount + allCapturedCards.length,
+        };
+        actionMessage = `${player.name} ha preso tutte le carte nell'ultima mano del mazzo (nessuna Scopa).`;
+      }
     } else {
       updatedPlayers[moverId] = {
         ...player,
@@ -976,8 +985,7 @@ export async function advanceGameAfterMove(
   // Primo di mano ruota al giocatore successivo
   const firstPlayerId = turnOrder[(nextDealerIndex + 1) % turnOrder.length];
 
-  const freshDeck = shuffleDeck(createStandardDeck());
-  const freshBoard = freshDeck.splice(0, 4);
+  const { mazzo: freshDeck, tavolo: freshBoard } = preparaDistribuzioneIniziale();
   const freshPrivateHands: Record<string, Card[]> = {};
   const resetCapturedPiles: Record<string, Card[]> = {};
 
