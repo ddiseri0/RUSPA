@@ -487,13 +487,22 @@ export async function submitCoveredMove(
 
   // Remove played card from private hand
   const currentHand = currentRoom.privateHands?.[move.playerId] || [];
-  const updatedHand = currentHand.filter((c) => c.id !== move.playedCard.id);
+  const cardIndex = currentHand.findIndex(
+    (c) =>
+      c.id === move.playedCard.id ||
+      ((c.valore ?? c.value) === (move.playedCard.valore ?? move.playedCard.value) &&
+        (c.seme ?? c.suit) === (move.playedCard.seme ?? move.playedCard.suit))
+  );
+  const updatedHand =
+    cardIndex >= 0
+      ? [...currentHand.slice(0, cardIndex), ...currentHand.slice(cardIndex + 1)]
+      : currentHand.filter((c) => c.id !== move.playedCard.id);
 
   const updatedPlayers = {
     ...currentRoom.players,
     [move.playerId]: {
       ...player,
-      handCount: Math.max(0, player.handCount - 1),
+      handCount: updatedHand.length,
     },
   };
 
@@ -501,7 +510,7 @@ export async function submitCoveredMove(
     ...currentRoom,
     players: updatedPlayers,
     privateHands: {
-      ...currentRoom.privateHands,
+      ...(currentRoom.privateHands || {}),
       [move.playerId]: updatedHand,
     },
   };
@@ -833,6 +842,7 @@ export async function advanceGameAfterMove(
       dubitoState: null,
       board: newBoard,
       players: updatedPlayers,
+      privateHands: room.privateHands,
       capturedPiles: updatedCapturedPiles,
       currentTurnPlayerId: nextPlayerId,
       lastCapturePlayerId,

@@ -135,10 +135,26 @@ export default function App() {
     }
   };
 
-  // Play covered card move
+  // Play card move with optimistic local hand update
   const handlePlayMove = async (move: Move) => {
     if (!currentRoom) return;
     try {
+      // Aggiornamento ottimistico immediato: la carta scompare all'istante dalla mano
+      const currentHand = currentRoom.privateHands?.[move.playerId] || [];
+      const updatedHand = currentHand.filter((c) => c.id !== move.playedCard.id);
+      const optimisticBoard = move.isDiscardFaceUp
+        ? [...currentRoom.board, move.playedCard]
+        : currentRoom.board;
+
+      setCurrentRoom({
+        ...currentRoom,
+        board: optimisticBoard,
+        privateHands: {
+          ...(currentRoom.privateHands || {}),
+          [move.playerId]: updatedHand,
+        },
+      });
+
       await submitCoveredMove(currentRoom.roomId, currentRoom, move);
     } catch (err: any) {
       setErrorMessage(err.message || 'Errore nella giocata della carta');
