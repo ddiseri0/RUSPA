@@ -30,7 +30,7 @@
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.3.4",
-    "socket.io-client": "^4.8.3",
+    "socket.io-client": "^4.8.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.2.2",
