@@ -39,19 +39,33 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
       targetedCards.length === boardCards.length &&
       boardCards.length > 0);
 
+  const onVoteRef = React.useRef(onVote);
+  onVoteRef.current = onVote;
+  const userVoteRef = React.useRef(userVote);
+  userVoteRef.current = userVote;
+  const isOpponentRef = React.useRef(isOpponent);
+  isOpponentRef.current = isOpponent;
+
   useEffect(() => {
+    setTimeLeft(10);
+    autoVotedRef.current = false;
+
     const interval = setInterval(() => {
-      const remainingMs = dubitoState.expiresAt - Date.now();
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-      setTimeLeft(remainingSec);
-      if (remainingMs <= 0 && isOpponent && !userVote && !autoVotedRef.current) {
-        autoVotedRef.current = true;
-        onVote('PASSA');
-      }
-    }, 150);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          if (isOpponentRef.current && !userVoteRef.current && !autoVotedRef.current) {
+            autoVotedRef.current = true;
+            onVoteRef.current('PASSA');
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [dubitoState.expiresAt, isOpponent, userVote, onVote]);
+  }, [dubitoState.initiatorId, dubitoState.move?.timestamp]);
 
   const opposingPlayers = Object.values(players).filter(
     (p) => p.team === dubitoState.targetTeam
