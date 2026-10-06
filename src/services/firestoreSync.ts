@@ -545,7 +545,7 @@ export async function submitCoveredMove(
     initiatorId: move.playerId,
     targetTeam,
     votes: {},
-    expiresAt: Date.now() + 5000, // 5 secondi di finestra per il Dubito
+    expiresAt: Date.now() + 10000, // 10 secondi di finestra per il Dubito
     status: 'PENDING',
   };
 

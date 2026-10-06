@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { GameMode, RoomState } from '../types/game';
+import { GameMode, RoomState, Player } from '../types/game';
 import { PlayerAvatar } from './PlayerAvatar';
+import { joinRoom } from '../services/firestoreSync';
 
 interface LobbyViewProps {
   currentRoom: RoomState | null;
@@ -39,6 +40,27 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
       navigator.clipboard.writeText(currentRoom.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleAddBot = async () => {
+    if (!currentRoom) return;
+    const botPlayer: Player = {
+      id: 'bot_8_' + Math.random().toString(36).substring(2, 6),
+      name: 'Giocatore 8',
+      avatarSeed: 'opp_8',
+      team: 2,
+      seat: playersList.length,
+      isReady: true,
+      handCount: 0,
+      capturedCount: 0,
+      scopaCount: 0,
+      score: 0,
+    };
+    try {
+      await joinRoom(currentRoom.code, botPlayer);
+    } catch (e) {
+      console.warn('Error adding bot:', e);
     }
   };
 
@@ -125,6 +147,16 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
         {/* Start Game or Waiting Action */}
         <div className="w-full max-w-xl mt-8 flex flex-col items-center">
+          {isHost && playersList.length < requiredPlayers && (
+            <button
+              onClick={handleAddBot}
+              className="mb-3 px-5 py-2.5 rounded-full bg-zinc-900 border border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all active:scale-95 flex items-center gap-2 shadow-md"
+            >
+              <span>+</span>
+              <span>Aggiungi Avversario (Giocatore 8)</span>
+            </button>
+          )}
+
           {isHost ? (
             <button
               onClick={onStartMatch}

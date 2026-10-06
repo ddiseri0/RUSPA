@@ -171,6 +171,102 @@ export default function App() {
     }
   };
 
+  // Automated Bot Move handler for bot turns
+  useEffect(() => {
+    if (
+      !currentRoom ||
+      currentRoom.phase !== 'PLAYER_TURN' ||
+      !currentRoom.currentTurnPlayerId ||
+      !currentRoom.currentTurnPlayerId.startsWith('bot_')
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const botId = currentRoom.currentTurnPlayerId;
+      const botHand = currentRoom.privateHands?.[botId] || [];
+      if (botHand.length === 0) return;
+
+      const botPlayer = currentRoom.players[botId];
+      const ace = botHand.find((c) => c.value === 1);
+      if (ace) {
+        const move: Move = {
+          playerId: botId,
+          playerName: botPlayer?.name || 'Giocatore 8',
+          playedCard: ace,
+          targetCardIds: currentRoom.board.map((c) => c.id),
+          isRuspa: true,
+          isDiscardFaceUp: false,
+          timestamp: Date.now(),
+        };
+        await handlePlayMove(move);
+        return;
+      }
+
+      for (const card of botHand) {
+        const matchingBoardCard = currentRoom.board.find((c) => c.value === card.value);
+        if (matchingBoardCard) {
+          const move: Move = {
+            playerId: botId,
+            playerName: botPlayer?.name || 'Giocatore 8',
+            playedCard: card,
+            targetCardIds: [matchingBoardCard.id],
+            isRuspa: false,
+            isDiscardFaceUp: false,
+            timestamp: Date.now(),
+          };
+          await handlePlayMove(move);
+          return;
+        }
+      }
+
+      const discardCard = botHand[0];
+      const move: Move = {
+        playerId: botId,
+        playerName: botPlayer?.name || 'Giocatore 8',
+        playedCard: discardCard,
+        targetCardIds: [],
+        isRuspa: false,
+        isDiscardFaceUp: true,
+        timestamp: Date.now(),
+      };
+      await handlePlayMove(move);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [currentRoom]);
+
+  // Automated Bot Dubito Vote handler
+  useEffect(() => {
+    if (
+      !currentRoom ||
+      currentRoom.phase !== 'DUBITO_WINDOW' ||
+      !currentRoom.dubitoState
+    ) {
+      return;
+    }
+
+    const { dubitoState } = currentRoom;
+    const botIds = Object.keys(currentRoom.players).filter((id) => id.startsWith('bot_'));
+    const pendingBot = botIds.find(
+      (id) =>
+        currentRoom.players[id]?.team === dubitoState.targetTeam &&
+        !dubitoState.votes[id]
+    );
+
+    if (!pendingBot) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        await submitDubitoVote(currentRoom.roomId, currentRoom, pendingBot, 'PASSA');
+      } catch (err) {
+        console.warn('Bot vote error:', err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentRoom]);
+
   // Register WebMCP bridge for agent automation and testing
   useEffect(() => {
     registerWebMcpBridge({
