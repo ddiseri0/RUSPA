@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { DubitoState, Player, Card, GameMode } from '../types/game';
-import { CardBack } from './CardBack';
 import { CardView } from './CardView';
 
 interface DubitoModalProps {
@@ -28,10 +27,12 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
 
   const autoVotedRef = React.useRef(false);
 
-  // Targeted cards
+  // Targeted cards from table
   const targetedCards = dubitoState.move.isRuspa
     ? boardCards
     : boardCards.filter((c) => dubitoState.move.targetCardIds.includes(c.id));
+
+  const cardsSum = targetedCards.reduce((acc, c) => acc + c.value, 0);
 
   const isDeclaredScopa =
     Boolean(dubitoState.move.isDeclaredScopa) ||
@@ -46,6 +47,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
   const isOpponentRef = React.useRef(isOpponent);
   isOpponentRef.current = isOpponent;
 
+  // 10s voting countdown
   useEffect(() => {
     setTimeLeft(10);
     autoVotedRef.current = false;
@@ -73,97 +75,92 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn select-none">
-      <div className="w-full max-w-md bg-[#1C1C1E] border border-zinc-800 rounded-3xl p-5 sm:p-7 flex flex-col items-center shadow-2xl relative overflow-hidden">
+      <div className="w-full max-w-md bg-[#262626] border border-[#383838] rounded-3xl p-5 sm:p-7 flex flex-col items-center shadow-2xl relative overflow-hidden">
         {/* Countdown Bar (10s timer) */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-zinc-800">
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#000000]">
           <div
-            className="h-full bg-rose-500 transition-all duration-200 ease-linear"
+            className="h-full bg-[#e3e700] shadow-[0_0_10px_#e3e700] transition-all duration-200 ease-linear"
             style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 10) * 100))}%` }}
           />
         </div>
 
         {/* Minimal Header with Timer */}
         <div className="flex items-center justify-between w-full mb-3 pt-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#d9d9d9]">
             DUBITO
           </span>
-          <span className="px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 font-mono text-xs font-bold text-rose-400">
+          <span className="px-2.5 py-0.5 rounded-full bg-[#000000] border border-[#383838] font-mono text-xs font-bold text-[#e3e700]">
             {timeLeft}s
           </span>
         </div>
 
         {/* Essential Statement */}
-        <div className="text-center mb-5">
+        <div className="text-center mb-3">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-[#f2f2f2] tracking-tight">
               {mover ? mover.name : 'Avversario'}
             </h2>
             {isDeclaredScopa && (
-              <span className="px-2.5 py-0.5 rounded-full bg-[#C6EF68]/20 border border-[#C6EF68]/50 text-[#C6EF68] text-[11px] font-black uppercase tracking-wider">
-                Dichiara Scopa!
+              <span className="px-2.5 py-0.5 rounded-full bg-[#000000] border border-[#e3e700]/70 text-[#e3e700] text-[11px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(227,231,0,0.3)]">
+                ★ Dichiara Scopa!
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-[#d9d9d9]">
             {dubitoState.move.isRuspa
-              ? 'Dichiara Ruspa: prende tutto il tavolo'
+              ? 'Dichiara Ruspa: spazza tutte le carte a terra!'
               : isDeclaredScopa
               ? `Dichiara Scopa prendendo tutte le ${targetedCards.length} carte a terra!`
-              : targetedCards.length > 0
-              ? `Dichiara la presa di ${targetedCards.length} ${targetedCards.length === 1 ? 'carta' : 'carte'}`
-              : 'Gioca a terra coperta'}
+              : targetedCards.length === 1
+              ? 'Dichiara la presa di questa carta dal tavolo:'
+              : 'Dichiara la presa di queste carte dal tavolo:'}
           </p>
         </div>
 
-        {/* Cards Focus: Played Covered Card & Target Cards */}
-        <div className="w-full bg-zinc-950/70 border border-zinc-850 rounded-2xl p-4 my-2 flex items-center justify-around gap-4">
-          {/* Carta Giocata (Coperta) */}
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500 mb-2">
-              Giocata
+        {/* FOCUS: SOLO LE CARTE DA PRENDERE DA TERRA, MOSTRATE IN GRANDE */}
+        <div className="w-full bg-[#000000]/70 border border-[#383838] rounded-2xl p-4 sm:p-5 my-2 flex flex-col items-center justify-center shadow-inner">
+          <div className="flex items-center justify-between w-full mb-3 px-1">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-[#d9d9d9]">
+              {dubitoState.move.isRuspa ? 'Tutto il Tavolo (Ruspa)' : 'Carte da prendere da terra'}
             </span>
-            <div className="scale-95 sm:scale-100">
-              <CardBack size="md" isPendingDoubt />
-            </div>
+            {targetedCards.length > 1 && !dubitoState.move.isRuspa && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#262626] border border-[#383838] text-[#f2f2f2]">
+                Somma: <strong className="text-[#e3e700] font-mono text-sm">{cardsSum}</strong>
+              </span>
+            )}
           </div>
 
-          {/* Freccia o separatore */}
-          <div className="text-zinc-600 font-mono text-sm">
-            ➔
-          </div>
-
-          {/* Carte che vuole prendere */}
-          <div className="flex flex-col items-center min-w-0">
-            <span className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500 mb-2">
-              Presa Dichiarata
-            </span>
-            <div className="flex items-center justify-center gap-1.5 flex-wrap max-w-[200px]">
-              {targetedCards.length === 0 ? (
-                <span className="text-xs text-zinc-600 italic">Nessuna</span>
-              ) : (
-                targetedCards.map((c) => (
-                  <CardView key={c.id} card={c} size="sm" />
-                ))
-              )}
-            </div>
+          <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap py-1">
+            {targetedCards.length === 0 ? (
+              <span className="text-sm text-[#d9d9d9]/70 italic py-4">Nessuna carta a terra selezionata</span>
+            ) : (
+              targetedCards.map((c) => (
+                <div key={c.id} className="relative transition-all duration-200 hover:scale-105">
+                  <CardView
+                    card={c}
+                    size={targetedCards.length <= 2 ? 'lg' : targetedCards.length <= 3 ? 'md' : 'sm'}
+                  />
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         {/* 2v2 Team Voting status */}
         {mode === '2v2' && (
-          <div className="w-full bg-zinc-900/60 rounded-xl p-2.5 my-3 flex items-center justify-around text-xs border border-zinc-800">
+          <div className="w-full bg-[#000000]/50 rounded-xl p-2.5 my-3 flex items-center justify-around text-xs border border-[#383838]">
             {opposingPlayers.map((p) => {
               const vote = dubitoState.votes[p.id];
               return (
                 <div key={p.id} className="flex items-center gap-1.5">
-                  <span className="text-zinc-300 text-xs font-medium">{p.name}:</span>
+                  <span className="text-[#f2f2f2] text-xs font-medium">{p.name}:</span>
                   <span
                     className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${
                       vote === 'DUBITO'
-                        ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                        ? 'bg-[#000000] text-[#e3e700] border border-[#e3e700]'
                         : vote === 'PASSA'
-                        ? 'bg-zinc-800 text-zinc-400'
-                        : 'bg-zinc-800/60 text-zinc-500 animate-pulse'
+                        ? 'bg-[#262626] text-[#d9d9d9] border border-[#383838]'
+                        : 'bg-[#000000]/40 text-[#d9d9d9]/60 animate-pulse'
                     }`}
                   >
                     {vote ? vote : 'Attesa...'}
@@ -181,8 +178,8 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
               onClick={() => onVote('DUBITO')}
               disabled={Boolean(userVote)}
               className={`
-                py-3.5 px-4 rounded-full font-bold text-sm transition-all shadow-lg active:scale-95
-                bg-rose-600 hover:bg-rose-500 text-white
+                py-3.5 px-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(227,231,0,0.4)] active:scale-95
+                bg-[#e3e700] hover:bg-[#d4d800] text-[#000000] cursor-pointer
                 disabled:opacity-40 disabled:cursor-not-allowed
               `}
             >
@@ -194,7 +191,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
               disabled={Boolean(userVote)}
               className={`
                 py-3.5 px-4 rounded-full font-semibold text-sm transition-all active:scale-95
-                bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700
+                bg-[#000000] hover:bg-[#1a1a1a] text-[#f2f2f2] border border-[#383838] cursor-pointer
                 disabled:opacity-40 disabled:cursor-not-allowed
               `}
             >
@@ -202,7 +199,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
             </button>
           </div>
         ) : (
-          <div className="mt-4 py-3 px-4 bg-zinc-900/60 rounded-2xl text-xs text-zinc-400 text-center w-full">
+          <div className="mt-4 py-3 px-4 bg-[#000000]/50 border border-[#383838] rounded-2xl text-xs text-[#d9d9d9] text-center w-full">
             In attesa della decisione degli avversari...
           </div>
         )}

@@ -13,7 +13,6 @@ import {
 } from './services/firestoreSync';
 import { LobbyView } from './components/LobbyView';
 import { GameBoard } from './components/GameBoard';
-import { McpDebugPanel } from './components/McpDebugPanel';
 import { registerWebMcpBridge } from './lib/webMcpBridge';
 
 export default function App() {
@@ -24,6 +23,11 @@ export default function App() {
     const defaultName = 'Giocatore ' + Math.floor(1 + Math.random() * 9);
     sessionStorage.setItem('ruspa_player_name', defaultName);
     return defaultName;
+  });
+  const [playerEmoji, setPlayerEmoji] = useState(() => {
+    const saved = sessionStorage.getItem('ruspa_player_emoji');
+    if (saved) return saved;
+    return '🥳';
   });
   const [currentRoom, setCurrentRoom] = useState<RoomState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +44,12 @@ export default function App() {
   const handleUpdatePlayerName = (name: string) => {
     setPlayerName(name);
     sessionStorage.setItem('ruspa_player_name', name);
+  };
+
+  // Save player emoji to session storage
+  const handleUpdatePlayerEmoji = (emoji: string) => {
+    setPlayerEmoji(emoji);
+    sessionStorage.setItem('ruspa_player_emoji', emoji);
   };
 
   // Subscribe to room changes when currentRoom has an ID
@@ -61,7 +71,7 @@ export default function App() {
 
   // Create room
   const handleCreateRoom = async (mode: GameMode) => {
-    if (!currentUser) return;
+    if (!currentUser) return null;
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -69,7 +79,7 @@ export default function App() {
       const hostPlayer: Player = {
         id: currentUser.uid,
         name: playerName.trim() || 'Giocatore 1',
-        avatarSeed: currentUser.uid,
+        avatarSeed: playerEmoji,
         team: 1,
         seat: 0,
         isReady: true,
@@ -83,9 +93,11 @@ export default function App() {
       const newRoom = await createRoom(hostPlayer, mode);
       setCurrentRoom(newRoom);
       setIsLoading(false);
+      return newRoom;
     } catch (err: any) {
       setErrorMessage(err.message || 'Errore nella creazione della stanza');
       setIsLoading(false);
+      return null;
     }
   };
 
@@ -99,7 +111,7 @@ export default function App() {
       const joiningPlayer: Player = {
         id: currentUser.uid,
         name: playerName.trim() || 'Ospite',
-        avatarSeed: currentUser.uid,
+        avatarSeed: playerEmoji,
         team: 2,
         seat: 1,
         isReady: true,
@@ -308,7 +320,8 @@ export default function App() {
     if (
       !currentRoom ||
       currentRoom.phase !== 'DUBITO_WINDOW' ||
-      !currentRoom.dubitoState
+      !currentRoom.dubitoState ||
+      currentRoom.dubitoState.status === 'RESOLVED'
     ) {
       return;
     }
@@ -432,14 +445,16 @@ export default function App() {
           currentUser={currentUser}
           playerName={playerName}
           setPlayerName={handleUpdatePlayerName}
+          playerEmoji={playerEmoji}
+          setPlayerEmoji={handleUpdatePlayerEmoji}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onStartMatch={handleStartMatch}
+          onLeaveRoom={handleLeaveRoom}
           isLoading={isLoading}
           errorMessage={errorMessage}
         />
       )}
-      <McpDebugPanel />
     </>
   );
 }

@@ -62,15 +62,15 @@ export const CardView: React.FC<CardViewProps> = ({
       }}
       className={`
         relative select-none shrink-0
-        ${disabled ? 'bg-[#ECECEE] cursor-not-allowed' : 'bg-white'}
+        ${disabled ? 'bg-[#d9d9d9] cursor-not-allowed' : 'bg-[#f2f2f2]'}
         shadow-[-3px_4px_14px_rgba(0,0,0,0.35)]
-        border border-black/[0.04]
+        border border-black/[0.08]
         transition-all duration-200 
         overflow-hidden
         ${sizeClasses}
         ${!disabled && onClick ? 'cursor-pointer hover:shadow-[-5px_8px_20px_rgba(0,0,0,0.4)]' : ''}
-        ${selected ? 'ring-2 ring-white/60 shadow-[0_0_24px_rgba(255,255,255,0.45)] z-30' : ''}
-        ${targetSelected ? 'ring-2 ring-[#C6EF68] shadow-[0_0_16px_rgba(198,239,104,0.4)]' : ''}
+        ${selected ? 'ring-3 ring-[#e3e700] shadow-[0_0_25px_rgba(227,231,0,0.85)] z-30' : ''}
+        ${targetSelected ? 'ring-3 ring-[#e3e700] shadow-[0_0_20px_rgba(227,231,0,0.8)]' : ''}
       `}
     >
       {/* Top-Left: Number / Rank with Suit Icon directly underneath */}
@@ -90,7 +90,7 @@ export const CardView: React.FC<CardViewProps> = ({
 
       {/* Settebello badge in Top-Right if applicable */}
       {card.isSettebello && (
-        <div className="absolute top-1.5 right-1.5 bg-amber-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full shadow border border-amber-300 uppercase tracking-wider">
+        <div className="absolute top-1.5 right-1.5 bg-[#000000] text-[#e3e700] text-[8px] font-black px-1.5 py-0.5 rounded-full shadow border border-[#e3e700]/60 uppercase tracking-wider">
           ★ 7B
         </div>
       )}

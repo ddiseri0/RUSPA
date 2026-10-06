@@ -5,7 +5,7 @@
 @layer base {
   body {
     background-color: #000000;
-    color: #ffffff;
+    color: #f2f2f2;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
     -webkit-tap-highlight-color: transparent;
   }

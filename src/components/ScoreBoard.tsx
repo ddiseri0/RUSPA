@@ -57,27 +57,27 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   const p2LeadsPrimiera = stats2.primieraScore > stats1.primieraScore && stats2.primieraScore > 0;
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-[#1C1C1E]/80 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-zinc-800/80 shadow-2xl select-none">
+    <div className="w-full max-w-4xl mx-auto flex flex-col gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-[#262626]/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-[#383838] shadow-2xl select-none">
       {/* Top Level: Prominent Scope Counter & Total Points */}
       <div className="flex items-center justify-between gap-2 sm:gap-4">
         {/* Team 1 Scope & Score */}
         <div className="flex-1 flex flex-col items-start min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-zinc-400 truncate max-w-[100px] sm:max-w-[160px]">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[#d9d9d9] truncate max-w-[100px] sm:max-w-[160px]">
               {team1Name}
             </span>
-            <span className="text-[9px] sm:text-[10px] font-mono text-zinc-500">
-              Tot: <strong className="text-zinc-200">{team1TotalScore}</strong>/21 pt
+            <span className="text-[9px] sm:text-[10px] font-mono text-[#d9d9d9]/70">
+              Tot: <strong className="text-[#f2f2f2]">{team1TotalScore}</strong>/21 pt
             </span>
           </div>
 
           {/* MAXIMUM PROMINENCE: Scope Counter */}
           <div className="flex items-baseline gap-1.5 mt-0.5">
-            <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight drop-shadow-sm flex items-center gap-1">
+            <span className="text-2xl sm:text-3xl font-black text-[#e3e700] tracking-tight drop-shadow-[0_0_12px_rgba(227,231,0,0.4)] flex items-center gap-1">
               <span>✨</span>
               <span>{team1Scope}</span>
             </span>
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300/90">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#d9d9d9]">
               {team1Scope === 1 ? 'Scopa' : 'Scope'}
             </span>
           </div>
@@ -85,15 +85,15 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
         {/* Center Badge: Deck Remaining & Manche */}
         <div className="flex flex-col items-center justify-center px-1.5 sm:px-3 shrink-0">
-          <div className="px-2.5 py-1 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col items-center shadow-inner">
-            <span className="text-[11px] sm:text-xs font-mono font-bold text-white tracking-widest leading-none">
-              {deckRemaining} <span className="text-[9px] font-normal text-zinc-400">/ 40</span>
+          <div className="px-2.5 py-1 rounded-xl bg-[#000000] border border-[#383838] flex flex-col items-center shadow-inner">
+            <span className="text-[11px] sm:text-xs font-mono font-bold text-[#f2f2f2] tracking-widest leading-none">
+              {deckRemaining} <span className="text-[9px] font-normal text-[#d9d9d9]">/ 40</span>
             </span>
-            <span className="text-[8px] uppercase tracking-wider text-zinc-400 mt-0.5">
+            <span className="text-[8px] uppercase tracking-wider text-[#d9d9d9] mt-0.5">
               Mazzo
             </span>
           </div>
-          <span className="text-[9px] text-zinc-400 mt-0.5 uppercase tracking-widest font-mono">
+          <span className="text-[9px] text-[#d9d9d9] mt-0.5 uppercase tracking-widest font-mono">
             Manche {mancheNumber}
           </span>
         </div>
@@ -101,20 +101,20 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
         {/* Team 2 Scope & Score */}
         <div className="flex-1 flex flex-col items-end text-right min-w-0">
           <div className="flex items-center gap-1.5 justify-end flex-wrap">
-            <span className="text-[9px] sm:text-[10px] font-mono text-zinc-500">
-              Tot: <strong className="text-zinc-200">{team2TotalScore}</strong>/21 pt
+            <span className="text-[9px] sm:text-[10px] font-mono text-[#d9d9d9]/70">
+              Tot: <strong className="text-[#f2f2f2]">{team2TotalScore}</strong>/21 pt
             </span>
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-zinc-400 truncate max-w-[100px] sm:max-w-[160px]">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[#d9d9d9] truncate max-w-[100px] sm:max-w-[160px]">
               {team2Name}
             </span>
           </div>
 
           {/* MAXIMUM PROMINENCE: Scope Counter */}
           <div className="flex items-baseline gap-1.5 mt-0.5">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300/90">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#d9d9d9]">
               {team2Scope === 1 ? 'Scopa' : 'Scope'}
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight drop-shadow-sm flex items-center gap-1">
+            <span className="text-2xl sm:text-3xl font-black text-[#e3e700] tracking-tight drop-shadow-[0_0_12px_rgba(227,231,0,0.4)] flex items-center gap-1">
               <span>{team2Scope}</span>
               <span>✨</span>
             </span>
@@ -123,15 +123,15 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
       </div>
 
       {/* Subito Sotto: Real-Time Classic Scopa Points (Settebello, Primiera, Denari, Carte) */}
-      <div className="w-full pt-1.5 border-t border-zinc-800/80 grid grid-cols-2 gap-1 sm:gap-3 text-[9px] sm:text-[10px]">
+      <div className="w-full pt-1.5 border-t border-[#383838] grid grid-cols-2 gap-1 sm:gap-3 text-[9px] sm:text-[10px]">
         {/* Team 1 Live Stats */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-start">
           {/* Settebello */}
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5 ${
               stats1.hasSettebello
-                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 animate-pulse'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#e3e700] border border-[#e3e700]'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             ★ 7B: {stats1.hasSettebello ? 'Preso' : '—'}
@@ -141,8 +141,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               p1LeadsPrimiera
-                ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#e3e700] border border-[#e3e700] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             70: {stats1.primieraScore}
@@ -152,8 +152,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               stats1.denariCount > 5
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             🪙 {stats1.denariCount}/10
@@ -163,8 +163,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               stats1.cardsCount > 20
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             🂠 {stats1.cardsCount}/40
@@ -177,8 +177,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               stats2.cardsCount > 20
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             🂠 {stats2.cardsCount}/40
@@ -188,8 +188,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               stats2.denariCount > 5
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             🪙 {stats2.denariCount}/10
@@ -199,8 +199,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-mono ${
               p2LeadsPrimiera
-                ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40 font-bold'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2] font-bold'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             70: {stats2.primieraScore}
@@ -210,8 +210,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <span
             className={`px-1.5 sm:px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5 ${
               stats2.hasSettebello
-                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 animate-pulse'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                ? 'bg-[#000000] text-[#f2f2f2] border border-[#f2f2f2]'
+                : 'bg-[#000000] text-[#d9d9d9]/70 border border-[#383838]'
             }`}
           >
             ★ 7B: {stats2.hasSettebello ? 'Preso' : '—'}

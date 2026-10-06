@@ -95,6 +95,25 @@ export interface VotoDubito {
 
 export type DubitoVote = VotoDubito;
 
+export interface DubitoResolution {
+  challengerId: string;
+  challengerName: string;
+  moverId: string;
+  moverName: string;
+  wasBluff: boolean;
+  isLegal: boolean;
+  reason: string;
+  playedCard: Carta;
+  targetCards: Carta[];
+  isRuspa: boolean;
+  isScopaCapture: boolean;
+  isScopae: boolean;
+  pointsAwarded: number;
+  winnerPlayerId: string;
+  winnerPlayerName: string;
+  resolvedAt: number;
+}
+
 export interface StatoDubito {
   active: boolean;
   attivo?: boolean;
@@ -120,6 +139,7 @@ export interface StatoDubito {
     idVincitore: string;
     descrizione: string;
   };
+  resolution?: DubitoResolution;
 }
 
 export type DubitoState = StatoDubito;
@@ -225,10 +245,20 @@ export interface RoomState {
     points: 2;
     timestamp: number;
   } | null;
+  dubitoEvent?: DubitoEvent | null;
   lastCapturePlayerId: string | null;
   lastActionMessage: string;
   updatedAt: number;
   privateHands?: Record<string, Card[]>;
+}
+
+export interface DubitoEvent {
+  result: 'RIUSCITO' | 'FALLITO';
+  winnerId: string;
+  winnerName: string;
+  points: number;
+  isScopae?: boolean;
+  timestamp: number;
 }
 
 export type StatoPartita = RoomState;
