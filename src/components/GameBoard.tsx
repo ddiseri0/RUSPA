@@ -4,6 +4,7 @@ import { CardView } from './CardView';
 import { CardBack } from './CardBack';
 import { PlayerTopPill, PlayerSquareCard } from './PlayerAvatar';
 import { DubitoModal } from './DubitoModal';
+import { ScopaeAnimation } from './ScopaeAnimation';
 import { getCardLabel } from '../engine/scopaRules';
 
 interface GameBoardProps {
@@ -23,6 +24,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 }) => {
   const [selectedHandCard, setSelectedHandCard] = useState<Card | null>(null);
   const [selectedBoardCards, setSelectedBoardCards] = useState<Card[]>([]);
+  const [dismissedScopaeTimestamp, setDismissedScopaeTimestamp] = useState<number | null>(null);
 
   if (!room || !room.players || !room.players[currentUserId]) {
     return (
@@ -93,6 +95,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       return;
     }
 
+    const isDeclaredScopa =
+      room.board.length > 0 && selectedBoardCards.length === room.board.length;
+
     const move: Move = {
       playerId: currentUserId,
       playerName: currentUser?.name || 'Giocatore',
@@ -100,6 +105,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       targetCardIds: selectedBoardCards.map((c) => c.id),
       isRuspa: false,
       isDiscardFaceUp: false,
+      isDeclaredScopa,
       timestamp: Date.now(),
     };
     onPlayMove(move);
@@ -341,6 +347,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           isCurrentTurn={room.currentTurnPlayerId === currentUserId}
         />
       </div>
+
+      {/* Celebratory SCOPAE Animation (+2 Points) */}
+      {room.scopaeEvent && room.scopaeEvent.timestamp !== dismissedScopaeTimestamp && (
+        <ScopaeAnimation
+          event={room.scopaeEvent}
+          currentUserId={currentUserId}
+          onDismiss={() => {
+            if (room.scopaeEvent) {
+              setDismissedScopaeTimestamp(room.scopaeEvent.timestamp);
+            }
+          }}
+        />
+      )}
 
       {/* Dubito Modal during challenge window (10s timer, no icons, focused on target cards) */}
       {room.phase === 'DUBITO_WINDOW' && room.dubitoState && (

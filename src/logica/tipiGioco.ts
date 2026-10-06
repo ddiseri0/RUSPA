@@ -78,6 +78,7 @@ export interface Mossa {
   eRuspa?: boolean;
   isDiscardFaceUp?: boolean;
   eScartoScoperto?: boolean;
+  isDeclaredScopa?: boolean;
   declaredOnly?: boolean;
   timestamp: number;
 }
@@ -174,6 +175,12 @@ export interface RoomState {
   lastMancheSummary?: string[];
   pendingMove: Move | null;
   dubitoState: DubitoState | null;
+  scopaeEvent?: {
+    winnerId: string;
+    winnerName: string;
+    points: 2;
+    timestamp: number;
+  } | null;
   lastCapturePlayerId: string | null;
   lastActionMessage: string;
   updatedAt: number;

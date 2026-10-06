@@ -671,14 +671,32 @@ export async function resolveDubitoChallenge(
     // Le carte a terra rimangono tutte sul tavolo e si aggiunge la carta giocata scoperta
     newBoard = [...currentRoom.board, pendingMove.playedCard];
   } else {
-    // Played card was legal! Challenger loses, Mover wins and gets a Scopa!
+    // Played card was legal! Challenger loses, Mover wins!
     winningTakerId = pendingMove.playerId;
     captureOccurred = true;
-    actionMessage = `❌ DUBITO FALLITO! La mossa di ${pendingMove.playerName} era valida (${cardName})! ${pendingMove.playerName} ottiene una SCOPA (+1 pt)!`;
+
+    // Verifica se è il momento "SCOPAE": presa di tutte le carte a terra + Dubito avversario fallito
+    const isScopaCapture =
+      !pendingMove.isRuspa &&
+      (Boolean(pendingMove.isDeclaredScopa) ||
+        (targetCards.length === currentRoom.board.length && currentRoom.board.length > 0));
+
+    let pointsAwarded = 1;
+    let scopaeTriggered = false;
+
+    if (isScopaCapture) {
+      // Momento "SCOPAE" (+2 PUNTI = 1 punto per la Scopa + 1 punto per il Dubito fallito)
+      pointsAwarded = 2;
+      scopaeTriggered = true;
+      actionMessage = `💥 SCOPAE! ${pendingMove.playerName} ha fatto SCOPA e ${challenger.name} ha dubitato a torto (+2 Punti: Scopa + Dubito fallito)!`;
+    } else {
+      actionMessage = `❌ DUBITO FALLITO! La mossa di ${pendingMove.playerName} era valida (${cardName})! ${pendingMove.playerName} ottiene una SCOPA (+1 pt)!`;
+    }
+
     updatedPlayers[pendingMove.playerId] = {
       ...updatedPlayers[pendingMove.playerId],
-      score: updatedPlayers[pendingMove.playerId].score + 1,
-      scopaCount: updatedPlayers[pendingMove.playerId].scopaCount + 1,
+      score: updatedPlayers[pendingMove.playerId].score + pointsAwarded,
+      scopaCount: updatedPlayers[pendingMove.playerId].scopaCount + pointsAwarded,
       capturedCount: updatedPlayers[pendingMove.playerId].capturedCount + allCapturedCards.length,
     };
     updatedCapturedPiles[pendingMove.playerId] = [
@@ -690,24 +708,32 @@ export async function resolveDubitoChallenge(
     } else {
       newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
     }
+
+    const roomWithoutPending: RoomState = {
+      ...currentRoom,
+      pendingMove: null,
+      dubitoState: null,
+      scopaeEvent: scopaeTriggered
+        ? {
+            winnerId: pendingMove.playerId,
+            winnerName: pendingMove.playerName,
+            points: 2,
+            timestamp: Date.now(),
+          }
+        : null,
+    };
+
+    await advanceGameAfterMove(
+      roomId,
+      roomWithoutPending,
+      newBoard,
+      updatedPlayers,
+      updatedCapturedPiles,
+      actionMessage,
+      winningTakerId,
+      captureOccurred
+    );
   }
-
-  const roomWithoutPending: RoomState = {
-    ...currentRoom,
-    pendingMove: null,
-    dubitoState: null,
-  };
-
-  await advanceGameAfterMove(
-    roomId,
-    roomWithoutPending,
-    newBoard,
-    updatedPlayers,
-    updatedCapturedPiles,
-    actionMessage,
-    winningTakerId,
-    captureOccurred
-  );
 }
 
 /**
@@ -840,6 +866,7 @@ export async function advanceGameAfterMove(
       phase: 'PLAYER_TURN',
       pendingMove: null,
       dubitoState: null,
+      scopaeEvent: room.scopaeEvent || null,
       board: newBoard,
       players: updatedPlayers,
       privateHands: room.privateHands,
@@ -882,6 +909,7 @@ export async function advanceGameAfterMove(
       phase: 'PLAYER_TURN',
       pendingMove: null,
       dubitoState: null,
+      scopaeEvent: room.scopaeEvent || null,
       board: newBoard,
       players: playersWithNewHands,
       privateHands: freshHands,
