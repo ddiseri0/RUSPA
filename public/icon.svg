@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1c1c1f" />
+      <stop offset="70%" stop-color="#0a0a0c" />
+      <stop offset="100%" stop-color="#000000" />
+    </radialGradient>
+
+    <!-- Card Shadow -->
+    <filter id="cardShadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#000000" flood-opacity="0.85" />
+    </filter>
+
+    <!-- Gold Gradient for Settebello / Stars -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe600" />
+      <stop offset="100%" stop-color="#d4a017" />
+    </linearGradient>
+
+    <!-- Pattern for card back -->
+    <pattern id="cardPattern" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="1.2" fill="#ffffff" fill-opacity="0.12" />
+    </pattern>
+  </defs>
+
+  <!-- Background with slight rounded corners for standalone SVG, dark sleek aesthetic -->
+  <rect width="512" height="512" fill="url(#bgGlow)" />
+  <rect width="512" height="512" fill="none" stroke="#27272a" stroke-width="2" />
+
+  <!-- Back Card (Tilted left, authentic Ruspa covered card style) -->
+  <g transform="translate(180, 255) rotate(-14) translate(-110, -160)" filter="url(#cardShadow)">
+    <rect width="220" height="320" rx="28" fill="#18181b" stroke="#3f3f46" stroke-width="3" />
+    <rect x="12" y="12" width="196" height="296" rx="20" fill="#121214" stroke="#27272a" stroke-width="1.5" />
+    <rect x="14" y="14" width="192" height="292" rx="18" fill="url(#cardPattern)" />
+    <!-- Center small badge -->
+    <circle cx="110" cy="160" r="26" fill="#1c1c1f" stroke="#52525b" stroke-width="1.5" />
+    <!-- Monogram R -->
+    <text x="110" y="169" font-family="-apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', sans-serif" font-weight="900" font-size="24" fill="#a1a1aa" text-anchor="middle">R</text>
+  </g>
+
+  <!-- Front Card (Tilted right, highlighting La Ruspa theme) -->
+  <g transform="translate(305, 260) rotate(8) translate(-110, -160)" filter="url(#cardShadow)">
+    <!-- Card Base -->
+    <rect width="220" height="320" rx="28" fill="#242427" stroke="#52525b" stroke-width="3.5" />
+    <rect x="12" y="12" width="196" height="296" rx="20" fill="#1a1a1c" stroke="#3f3f46" stroke-width="1.5" />
+    <rect x="14" y="14" width="192" height="292" rx="18" fill="url(#cardPattern)" />
+
+    <!-- Card Inner Glowing Frame -->
+    <rect x="18" y="18" width="184" height="284" rx="16" fill="none" stroke="#ffe600" stroke-opacity="0.3" stroke-width="1" />
+
+    <!-- Center Emblem: Ace / Sun of Denari -->
+    <g transform="translate(110, 142)">
+      <!-- Radiant Denaro / Coin -->
+      <circle cx="0" cy="0" r="46" fill="#18181b" stroke="url(#goldGrad)" stroke-width="3.5" />
+      <circle cx="0" cy="0" r="38" fill="none" stroke="#ffe600" stroke-width="1" stroke-dasharray="4 3" opacity="0.6" />
+      
+      <!-- Central Star / Settebello / Asso Symbol -->
+      <polygon points="0,-22 6,-7 22,-6 10,6 14,22 0,12 -14,22 -10,6 -22,-6 -6,-7" fill="url(#goldGrad)" />
+    </g>
+
+    <!-- Typography: RUSPA -->
+    <text x="110" y="235" font-family="-apple-system, BlinkMacSystemFont, 'Outfit', 'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="22" letter-spacing="4" fill="#ffffff" text-anchor="middle">RUSPA</text>
+    <text x="110" y="254" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="600" font-size="9" letter-spacing="3" fill="#a1a1aa" text-anchor="middle">SCOPA COPERTA</text>
+
+    <!-- Subtle Suit Marks in corners -->
+    <text x="32" y="44" font-family="-apple-system, sans-serif" font-weight="800" font-size="14" fill="#ffe600">★</text>
+    <text x="188" y="286" font-family="-apple-system, sans-serif" font-weight="800" font-size="14" fill="#ffe600" text-anchor="end">★</text>
+  </g>
+</svg>
