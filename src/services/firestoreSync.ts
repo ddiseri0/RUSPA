@@ -563,6 +563,7 @@ export async function submitCoveredMove(
       [move.playerId]: updatedHand,
     },
     scopaeEvent: null,
+    dubitoEvent: null,
     lastActionMessage: moveDesc,
     updatedAt: Date.now(),
   };
@@ -650,73 +651,51 @@ export async function resolveDubitoChallenge(
   const updatedCapturedPiles = { ...(currentRoom.capturedPiles || {}) };
   let actionMessage = '';
   let winningTakerId = '';
-
   const allCapturedCards = [pendingMove.playedCard, ...targetCards];
-
   let captureOccurred = false;
   const cardName = `${getCardLabel(pendingMove.playedCard.value)} di ${SUIT_NAMES[pendingMove.playedCard.suit]}`;
 
-  if (!verification.isLegal) {
+  let isScopaCapture = false;
+  let pointsAwarded = 1;
+  let scopaeTriggered = false;
+  const wasBluff = !verification.isLegal;
+
+  if (wasBluff) {
     // Bluff exposed! Challenger wins +1 point / Scopa!
-    // Le carte bersaglio e la carta giocata vengono rimesse a terra scoperte
     winningTakerId = challengerId;
     captureOccurred = false;
-    actionMessage = `🚨 DUBITO RIUSCITO! ${challenger.name} ha smascherato il bluff di ${pendingMove.playerName} (+1 pt)! Le carte restano a terra e ${cardName} viene calata scoperta.`;
-    
+    pointsAwarded = 1;
+    actionMessage = `🚨 DUBITO RIUSCITO! ${challenger.name} ha smascherato il bluff di ${pendingMove.playerName} (+1 pt)!`;
+
     updatedPlayers[challengerId] = {
       ...updatedPlayers[challengerId],
       score: updatedPlayers[challengerId].score + 1,
       scopaCount: updatedPlayers[challengerId].scopaCount + 1,
     };
-    
-    // Le carte a terra rimangono tutte sul tavolo e si aggiunge la carta giocata scoperta
     newBoard = [...currentRoom.board, pendingMove.playedCard];
-
-    const roomWithoutPending: RoomState = {
-      ...currentRoom,
-      pendingMove: null,
-      dubitoState: null,
-      scopaeEvent: null,
-    };
-
-    await advanceGameAfterMove(
-      roomId,
-      roomWithoutPending,
-      newBoard,
-      updatedPlayers,
-      updatedCapturedPiles,
-      actionMessage,
-      winningTakerId,
-      captureOccurred
-    );
   } else {
     // Played card was legal! Challenger loses, Mover wins!
     winningTakerId = pendingMove.playerId;
     captureOccurred = true;
 
-    // Verifica se è il momento "SCOPAE": presa di tutte le carte a terra + Dubito avversario fallito
-    const isScopaCapture =
+    isScopaCapture =
       !pendingMove.isRuspa &&
       (Boolean(pendingMove.isDeclaredScopa) ||
         (targetCards.length === currentRoom.board.length && currentRoom.board.length > 0));
 
-    let pointsAwarded = 1;
-    let scopaeTriggered = false;
-
     if (isScopaCapture) {
-      // Momento "SCOPAE" (+2 PUNTI = 1 punto per la Scopa + 1 punto per il Dubito fallito)
       pointsAwarded = 2;
       scopaeTriggered = true;
-      actionMessage = `💥 SCOPAE! ${pendingMove.playerName} ha fatto SCOPA e ${challenger.name} ha dubitato a torto (+2 Punti: Scopa + Dubito fallito)!`;
+      actionMessage = `💥 SCOPEE! ${pendingMove.playerName} ha fatto SCOPA e ${challenger.name} ha dubitato a torto (+2 Punti)!`;
     } else {
-      actionMessage = `❌ DUBITO FALLITO! La mossa di ${pendingMove.playerName} era valida (${cardName})! ${pendingMove.playerName} ottiene una SCOPA (+1 pt)!`;
+      actionMessage = `❌ DUBITO FALLITO! La mossa di ${pendingMove.playerName} era valida (${cardName})! (+1 pt per ${pendingMove.playerName})`;
     }
 
     updatedPlayers[pendingMove.playerId] = {
       ...updatedPlayers[pendingMove.playerId],
       score: updatedPlayers[pendingMove.playerId].score + pointsAwarded,
       scopaCount: updatedPlayers[pendingMove.playerId].scopaCount + pointsAwarded,
-      capturedCount: updatedPlayers[pendingMove.playerId].capturedCount + allCapturedCards.length,
+      capturedCount: (updatedPlayers[pendingMove.playerId].capturedCount || 0) + allCapturedCards.length,
     };
     updatedCapturedPiles[pendingMove.playerId] = [
       ...(updatedCapturedPiles[pendingMove.playerId] || []),
@@ -727,32 +706,121 @@ export async function resolveDubitoChallenge(
     } else {
       newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
     }
+  }
 
-    const roomWithoutPending: RoomState = {
-      ...currentRoom,
-      pendingMove: null,
-      dubitoState: null,
-      scopaeEvent: scopaeTriggered
-        ? {
-            winnerId: pendingMove.playerId,
-            winnerName: pendingMove.playerName,
-            points: 2,
-            timestamp: Date.now(),
-          }
-        : null,
-    };
+  const roomWithoutPending: RoomState = {
+    ...currentRoom,
+    pendingMove: null,
+    dubitoState: null,
+    scopaeEvent: null,
+    dubitoEvent: {
+      result: wasBluff ? 'RIUSCITO' : 'FALLITO',
+      winnerId: winningTakerId,
+      winnerName: winningTakerId === challengerId ? challenger.name : pendingMove.playerName,
+      points: pointsAwarded,
+      isScopae: scopaeTriggered,
+      timestamp: Date.now(),
+    },
+  };
 
-    await advanceGameAfterMove(
-      roomId,
-      roomWithoutPending,
-      newBoard,
-      updatedPlayers,
-      updatedCapturedPiles,
-      actionMessage,
-      winningTakerId,
-      captureOccurred
+  await advanceGameAfterMove(
+    roomId,
+    roomWithoutPending,
+    newBoard,
+    updatedPlayers,
+    updatedCapturedPiles,
+    actionMessage,
+    winningTakerId,
+    captureOccurred
+  );
+}
+
+/**
+ * Finalizes the resolution of a Dubito challenge and advances the game
+ */
+export async function finalizeDubitoResolution(
+  roomId: string,
+  currentRoom: RoomState
+): Promise<void> {
+  const { pendingMove, dubitoState } = currentRoom;
+  if (!pendingMove || !dubitoState || dubitoState.status !== 'RESOLVED' || !dubitoState.resolution) {
+    return;
+  }
+
+  const res = dubitoState.resolution;
+  let targetCards: Card[] = [];
+  if (pendingMove.isRuspa) {
+    targetCards = [...currentRoom.board];
+  } else {
+    targetCards = currentRoom.board.filter((c) =>
+      pendingMove.targetCardIds.includes(c.id)
     );
   }
+
+  let newBoard = [...currentRoom.board];
+  const updatedPlayers = { ...currentRoom.players };
+  const updatedCapturedPiles = { ...(currentRoom.capturedPiles || {}) };
+  const allCapturedCards = [pendingMove.playedCard, ...targetCards];
+  let captureOccurred = false;
+
+  if (res.wasBluff) {
+    // Bluff exposed: challenger won +1 point / Scopa
+    captureOccurred = false;
+    if (updatedPlayers[res.challengerId]) {
+      updatedPlayers[res.challengerId] = {
+        ...updatedPlayers[res.challengerId],
+        score: updatedPlayers[res.challengerId].score + res.pointsAwarded,
+        scopaCount: updatedPlayers[res.challengerId].scopaCount + res.pointsAwarded,
+      };
+    }
+    // Le carte a terra rimangono tutte sul tavolo e si aggiunge la carta giocata scoperta
+    newBoard = [...currentRoom.board, pendingMove.playedCard];
+  } else {
+    // Legal move: mover won points
+    captureOccurred = true;
+    if (updatedPlayers[res.moverId]) {
+      updatedPlayers[res.moverId] = {
+        ...updatedPlayers[res.moverId],
+        score: updatedPlayers[res.moverId].score + res.pointsAwarded,
+        scopaCount: updatedPlayers[res.moverId].scopaCount + res.pointsAwarded,
+        capturedCount: (updatedPlayers[res.moverId].capturedCount || 0) + allCapturedCards.length,
+      };
+    }
+    updatedCapturedPiles[res.moverId] = [
+      ...(updatedCapturedPiles[res.moverId] || []),
+      ...allCapturedCards,
+    ];
+    if (pendingMove.isRuspa) {
+      newBoard = [];
+    } else {
+      newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
+    }
+  }
+
+  const roomWithoutPending: RoomState = {
+    ...currentRoom,
+    pendingMove: null,
+    dubitoState: null,
+    scopaeEvent: res.isScopae
+      ? {
+          winnerId: res.moverId,
+          winnerName: res.moverName,
+          points: 2,
+          timestamp: Date.now(),
+        }
+      : null,
+  };
+
+  await advanceGameAfterMove(
+    roomId,
+    roomWithoutPending,
+    newBoard,
+    updatedPlayers,
+    updatedCapturedPiles,
+    currentRoom.lastActionMessage,
+    res.winnerPlayerId,
+    captureOccurred
+  );
 }
 
 /**
@@ -887,6 +955,7 @@ export async function advanceGameAfterMove(
       pendingMove: null,
       dubitoState: null,
       scopaeEvent: room.scopaeEvent || null,
+      dubitoEvent: room.dubitoEvent || null,
       board: newBoard,
       players: updatedPlayers,
       privateHands: room.privateHands,
@@ -930,6 +999,7 @@ export async function advanceGameAfterMove(
       pendingMove: null,
       dubitoState: null,
       scopaeEvent: room.scopaeEvent || null,
+      dubitoEvent: room.dubitoEvent || null,
       board: newBoard,
       players: playersWithNewHands,
       privateHands: freshHands,
@@ -1055,6 +1125,7 @@ export async function advanceGameAfterMove(
     phase: 'ROUND_OVER',
     pendingMove: null,
     dubitoState: null,
+    dubitoEvent: room.dubitoEvent || null,
     board: [],
     players: finalPlayers,
     capturedPiles: finalCapturedPiles,

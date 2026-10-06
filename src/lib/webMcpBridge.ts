@@ -59,7 +59,7 @@ export function registerWebMcpBridge(params: {
   currentUser: { uid: string } | null;
   playerName: string;
   currentRoom: RoomState | null;
-  onCreateRoom: (mode: GameMode) => Promise<void>;
+  onCreateRoom: (mode: GameMode) => Promise<RoomState | null | void>;
   onJoinRoom: (code: string) => Promise<void>;
   onStartMatch: () => Promise<void>;
   onPlayMove: (move: Move) => Promise<void>;
@@ -103,7 +103,10 @@ export function registerWebMcpBridge(params: {
     createRoom: async (modeInput: any = '1v1') => {
       const mode: GameMode = typeof modeInput === 'string' ? (modeInput as GameMode) : (modeInput?.mode || '1v1');
       console.log('[WebMCP] Creating room in mode:', mode);
-      await params.onCreateRoom(mode);
+      const createdRoom = await params.onCreateRoom(mode);
+      if (createdRoom) {
+        params.currentRoom = createdRoom;
+      }
       return bridge.getStatus();
     },
 

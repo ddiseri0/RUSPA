@@ -7,12 +7,27 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        carbon: '#1C1C1E',
-        'carbon-light': '#2C2C2E',
-        'suit-denari': '#F59E0B',
-        'suit-coppe': '#E11D48',
-        'suit-spade': '#0EA5E9',
-        'suit-bastoni': '#10B981',
+        theme: {
+          dark: '#000000',
+          panel: '#262626',
+          muted: '#d9d9d9',
+          light: '#e6e6e6',
+          bright: '#f2f2f2',
+        },
+        'app-black': '#000000',
+        'app-panel': '#262626',
+        'app-muted': '#d9d9d9',
+        'app-light': '#e6e6e6',
+        'app-bright': '#f2f2f2',
+        carbon: '#262626',
+        'carbon-light': '#333333',
+        highlight: '#e3e700',
+        accent: '#e3e700',
+        // Card suits (preserved as requested)
+        'suit-denari': '#D97706',
+        'suit-coppe': '#DC2626',
+        'suit-spade': '#2563EB',
+        'suit-bastoni': '#78350F',
       },
       fontFamily: {
         sans: [

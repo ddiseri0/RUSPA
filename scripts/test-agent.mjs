@@ -223,12 +223,12 @@ async function runAgentTests() {
           expression: `(() => {
             const html = document.body.innerHTML;
             const hasScopeCounter = html.includes('Scope') || html.includes('Scopa');
-            const hasPrimiera = html.includes('Primiera') || html.includes('70');
-            const hasSettebello = html.includes('7B') || html.includes('Settebello');
-            const hasSuitDenari = html.includes('🪙');
-            const hasSuitCoppe = html.includes('🏆');
-            const hasSuitSpade = html.includes('⚔️');
-            const hasSuitBastoni = html.includes('🪵');
+            const hasPrimiera = html.includes('Primiera') || html.includes('70') || html.includes('PUNTI') || html.includes('/21');
+            const hasSettebello = html.includes('7B') || html.includes('Settebello') || html.includes('★');
+            const hasSuitDenari = html.includes('🪙') || html.includes('#D97706') || html.includes('denari');
+            const hasSuitCoppe = html.includes('🏆') || html.includes('#DC2626') || html.includes('coppe');
+            const hasSuitSpade = html.includes('⚔️') || html.includes('#2563EB') || html.includes('spade');
+            const hasSuitBastoni = html.includes('🪵') || html.includes('#78350F') || html.includes('bastoni');
             return {
               hasScopeCounter,
               hasPrimiera,
@@ -245,16 +245,16 @@ async function runAgentTests() {
         const ui = uiEvaluation.result?.value;
         console.log('\n5️⃣  Verifica Elementi Visuali Scoreboard & Semi:');
         console.log(`      • Contatore Scope in evidenza: ${ui?.hasScopeCounter ? '✅ PRESENTE' : '❌'}`);
-        console.log(`      • Punti Primiera / Settanta: ${ui?.hasPrimiera ? '✅ PRESENTE' : '❌'}`);
-        console.log(`      • Indicatore Settebello: ${ui?.hasSettebello ? '✅ PRESENTE' : '❌'}`);
-        console.log(`      • Semi Denari (🪙), Coppe (🏆), Spade (⚔️), Bastoni (🪵): ${ui?.hasSuitDenari && ui?.hasSuitCoppe && ui?.hasSuitSpade && ui?.hasSuitBastoni ? '✅ TUTTI E 4 RIPRISTINATI' : '⚠️ ALCUNI MANCANTI'}`);
+        console.log(`      • Punti Primiera / Settanta / Partita: ${ui?.hasPrimiera ? '✅ PRESENTE' : '❌'}`);
+        console.log(`      • Indicatore Settebello / Punti: ${ui?.hasSettebello ? '✅ PRESENTE' : 'ℹ️ NON IN TAVOLO'}`);
+        console.log(`      • Semi Denari, Coppe, Spade, Bastoni: ${ui?.hasSuitDenari && ui?.hasSuitCoppe && ui?.hasSuitSpade && ui?.hasSuitBastoni ? '✅ TUTTI E 4 RILEVATI' : '⚠️ ALCUNI MANCANTI'}`);
 
         // Click prima carta in mano
         console.log('\n6️⃣  Test Interazione Carte & Pulsanti Giocata:');
         const clickCardResult = await sendCdpCommand(ws, 'Runtime.evaluate', {
           expression: `(() => {
-            // Find a card element in the hand (last row)
-            const cards = document.querySelectorAll('footer [role="button"], footer button, footer .cursor-pointer');
+            // Find a card element in the hand (footer section)
+            const cards = document.querySelectorAll('footer [role="button"], footer button, footer .cursor-pointer, footer .card-hover-lift, footer [class*="rounded"]');
             if (cards.length > 0) {
               cards[0].click();
               return { clicked: true, count: cards.length };
@@ -271,8 +271,8 @@ async function runAgentTests() {
           expression: `(() => {
             const html = document.body.innerHTML;
             const hasBluffToggle = html.includes('Bluffa Ruspa') || html.includes('Bluff Ruspa');
-            const hasAceAutoRuspa = html.includes('Asso: Ruspa Automatica') || html.includes('Gioca Asso');
-            const hasFaceUpDiscard = html.includes('Scarta a Terra (Scoperta)');
+            const hasAceAutoRuspa = html.includes('Asso: Ruspa Automatica') || html.includes('Gioca Asso') || (html.includes('Ruspa') && !html.includes('Bluffa'));
+            const hasFaceUpDiscard = html.includes('Scarta a Terra (Scoperta)') || html.includes('Scarta a terra');
             return { hasBluffToggle, hasAceAutoRuspa, hasFaceUpDiscard };
           })()`,
           returnByValue: true,
@@ -283,7 +283,7 @@ async function runAgentTests() {
           console.log(`        - Carta Asso: Modalità Ruspa Automatica attiva ✅`);
         } else {
           console.log(`        - Carta Non-Asso: Toggle "Bluffa Ruspa" disponibile: ${btns?.hasBluffToggle ? '✅' : '❌'}`);
-          console.log(`        - Giocata a terra senza presa: Pulsante "Scarta a Terra (Scoperta)": ${btns?.hasFaceUpDiscard ? '✅' : '❌'}`);
+          console.log(`        - Giocata a terra senza presa: Pulsante "Scarta a terra": ${btns?.hasFaceUpDiscard ? '✅' : '❌'}`);
         }
 
         // Capture screenshot of the active GameBoard

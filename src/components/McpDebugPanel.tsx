@@ -48,55 +48,55 @@ export const McpDebugPanel: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] select-none font-sans text-xs">
+    <div className="fixed top-2.5 left-14 sm:top-auto sm:left-auto sm:bottom-4 sm:right-4 z-[9999] select-none font-sans text-xs">
       {!isOpen ? (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/90 border border-zinc-700/80 text-zinc-300 hover:text-white hover:border-zinc-500 shadow-xl backdrop-blur-md transition-all active:scale-95"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#262626]/90 border border-[#383838] text-[#d9d9d9] hover:text-[#f2f2f2] hover:border-[#f2f2f2]/40 shadow-xl backdrop-blur-md transition-all active:scale-95"
           title="Apri WebMCP Test Bridge"
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-[#f2f2f2] animate-pulse" />
           <span className="font-mono font-medium tracking-wide">WebMCP Active</span>
         </button>
       ) : (
-        <div className="w-80 sm:w-96 bg-[#18181B] border border-zinc-700 rounded-3xl p-5 shadow-2xl backdrop-blur-xl text-white flex flex-col gap-3 animate-fadeIn">
+        <div className="w-80 sm:w-96 bg-[#262626] border border-[#383838] rounded-3xl p-5 shadow-2xl backdrop-blur-xl text-[#f2f2f2] flex flex-col gap-3 animate-fadeIn">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div className="flex items-center justify-between border-b border-[#383838] pb-3">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f2f2f2] animate-pulse" />
               <span className="font-semibold text-sm">WebMCP Agent Bridge</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-zinc-400 hover:text-white text-xs px-2 py-0.5 rounded-full hover:bg-zinc-800"
+              className="text-[#d9d9d9] hover:text-[#f2f2f2] text-xs px-2 py-0.5 rounded-full hover:bg-[#383838]"
             >
               Chiudi ✕
             </button>
           </div>
 
           {/* Status info */}
-          <div className="bg-zinc-900/80 border border-zinc-800 p-3 rounded-2xl flex flex-col gap-1 text-[11px] font-mono">
+          <div className="bg-[#000000]/70 border border-[#383838] p-3 rounded-2xl flex flex-col gap-1 text-[11px] font-mono">
             <div className="flex justify-between">
-              <span className="text-zinc-500">Schermata:</span>
-              <span className="text-emerald-400 font-bold">{status?.currentScreen || 'N/A'}</span>
+              <span className="text-[#d9d9d9]">Schermata:</span>
+              <span className="text-[#f2f2f2] font-bold">{status?.currentScreen || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-500">Giocatore:</span>
-              <span className="text-zinc-200">{status?.playerName || 'N/A'}</span>
+              <span className="text-[#d9d9d9]">Giocatore:</span>
+              <span className="text-[#f2f2f2]">{status?.playerName || 'N/A'}</span>
             </div>
             {status?.currentRoom && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Codice Stanza:</span>
-                  <span className="text-amber-400 font-bold">{status.currentRoom.code}</span>
+                  <span className="text-[#d9d9d9]">Codice Stanza:</span>
+                  <span className="text-[#f2f2f2] font-bold">{status.currentRoom.code}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Fase Gioco:</span>
-                  <span className="text-zinc-200">{status.currentRoom.phase}</span>
+                  <span className="text-[#d9d9d9]">Fase Gioco:</span>
+                  <span className="text-[#f2f2f2]">{status.currentRoom.phase}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Giocatori Connessi:</span>
-                  <span className="text-zinc-200">{status.currentRoom.playersCount}</span>
+                  <span className="text-[#d9d9d9]">Giocatori Connessi:</span>
+                  <span className="text-[#f2f2f2]">{status.currentRoom.playersCount}</span>
                 </div>
               </>
             )}
@@ -107,14 +107,14 @@ export const McpDebugPanel: React.FC = () => {
             <button
               onClick={handleRunTest}
               disabled={isRunning}
-              className="flex-1 py-2 px-3 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 transition-all shadow-md disabled:opacity-50"
+              className="flex-1 py-2 px-3 rounded-xl bg-[#f2f2f2] text-[#000000] font-semibold text-xs hover:bg-[#e6e6e6] active:scale-95 transition-all shadow-md disabled:opacity-50"
             >
               {isRunning ? 'Esecuzione...' : '▶ Esegui Test Regole'}
             </button>
             {!status?.currentRoom && (
               <button
                 onClick={handleQuickCreate}
-                className="py-2 px-3 rounded-xl bg-zinc-800 text-zinc-200 hover:bg-zinc-700 active:scale-95 transition-all"
+                className="py-2 px-3 rounded-xl bg-[#000000] text-[#f2f2f2] border border-[#383838] hover:bg-[#1a1a1a] active:scale-95 transition-all"
               >
                 Crea Stanza
               </button>
@@ -125,17 +125,17 @@ export const McpDebugPanel: React.FC = () => {
           {testLog && (
             <div className="mt-1">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                <span className="text-[10px] text-[#d9d9d9] uppercase tracking-wider">
                   Report Test
                 </span>
                 <button
                   onClick={() => setTestLog(null)}
-                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                  className="text-[10px] text-[#d9d9d9] hover:text-[#f2f2f2]"
                 >
                   Pulisci
                 </button>
               </div>
-              <pre className="max-h-40 overflow-y-auto bg-black/80 border border-zinc-800 p-2.5 rounded-xl text-[10px] font-mono text-emerald-300 leading-tight">
+              <pre className="max-h-40 overflow-y-auto bg-[#000000]/90 border border-[#383838] p-2.5 rounded-xl text-[10px] font-mono text-[#f2f2f2] leading-tight">
                 {testLog}
               </pre>
             </div>
