@@ -26,17 +26,26 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
   const isOpponent = user && user.team === dubitoState.targetTeam;
   const userVote = dubitoState.votes[currentUserId];
 
+  const autoVotedRef = React.useRef(false);
+
   // Targeted cards
   const targetedCards = dubitoState.move.isRuspa
     ? boardCards
     : boardCards.filter((c) => dubitoState.move.targetCardIds.includes(c.id));
+
+  const isDeclaredScopa =
+    Boolean(dubitoState.move.isDeclaredScopa) ||
+    (!dubitoState.move.isRuspa &&
+      targetedCards.length === boardCards.length &&
+      boardCards.length > 0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const remainingMs = dubitoState.expiresAt - Date.now();
       const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
       setTimeLeft(remainingSec);
-      if (remainingMs <= 0 && isOpponent && !userVote) {
+      if (remainingMs <= 0 && isOpponent && !userVote && !autoVotedRef.current) {
+        autoVotedRef.current = true;
         onVote('PASSA');
       }
     }, 150);
@@ -71,12 +80,21 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
 
         {/* Essential Statement */}
         <div className="text-center mb-5">
-          <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-            {mover ? mover.name : 'Avversario'}
-          </h2>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              {mover ? mover.name : 'Avversario'}
+            </h2>
+            {isDeclaredScopa && (
+              <span className="px-2.5 py-0.5 rounded-full bg-[#C6EF68]/20 border border-[#C6EF68]/50 text-[#C6EF68] text-[11px] font-black uppercase tracking-wider">
+                Dichiara Scopa!
+              </span>
+            )}
+          </div>
           <p className="text-xs text-zinc-400 mt-0.5">
             {dubitoState.move.isRuspa
               ? 'Dichiara Ruspa: prende tutto il tavolo'
+              : isDeclaredScopa
+              ? `Dichiara Scopa prendendo tutte le ${targetedCards.length} carte a terra!`
               : targetedCards.length > 0
               ? `Dichiara la presa di ${targetedCards.length} ${targetedCards.length === 1 ? 'carta' : 'carte'}`
               : 'Gioca a terra coperta'}

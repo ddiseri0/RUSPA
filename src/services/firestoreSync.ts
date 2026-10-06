@@ -562,6 +562,7 @@ export async function submitCoveredMove(
       ...currentRoom.privateHands,
       [move.playerId]: updatedHand,
     },
+    scopaeEvent: null,
     lastActionMessage: moveDesc,
     updatedAt: Date.now(),
   };
@@ -670,6 +671,24 @@ export async function resolveDubitoChallenge(
     
     // Le carte a terra rimangono tutte sul tavolo e si aggiunge la carta giocata scoperta
     newBoard = [...currentRoom.board, pendingMove.playedCard];
+
+    const roomWithoutPending: RoomState = {
+      ...currentRoom,
+      pendingMove: null,
+      dubitoState: null,
+      scopaeEvent: null,
+    };
+
+    await advanceGameAfterMove(
+      roomId,
+      roomWithoutPending,
+      newBoard,
+      updatedPlayers,
+      updatedCapturedPiles,
+      actionMessage,
+      winningTakerId,
+      captureOccurred
+    );
   } else {
     // Played card was legal! Challenger loses, Mover wins!
     winningTakerId = pendingMove.playerId;
@@ -816,6 +835,7 @@ export async function resolvePassMove(roomId: string, currentRoom: RoomState): P
     ...currentRoom,
     pendingMove: null,
     dubitoState: null,
+    scopaeEvent: null,
   };
 
   await advanceGameAfterMove(

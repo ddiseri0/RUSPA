@@ -84,9 +84,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const handlePlayCapture = () => {
     if (!selectedHandCard || !isMyTurn || selectedBoardCards.length === 0) return;
 
-    // Regola Ufficiale: Priorità Presa Singola
+    const isDeclaredScopa =
+      room.board.length > 0 && selectedBoardCards.length === room.board.length;
+
+    // Regola Ufficiale: Priorità Presa Singola per prese parziali
     const cartaSingolaPresente = room.board.some((c) => c.value === selectedHandCard.value);
-    if (cartaSingolaPresente && selectedBoardCards.length > 1) {
+    if (!isDeclaredScopa && cartaSingolaPresente && selectedBoardCards.length > 1) {
       alert(
         `Regola Ufficiale: È presente a terra una carta di valore ${selectedHandCard.value} (${getCardLabel(
           selectedHandCard.value
@@ -94,9 +97,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       );
       return;
     }
-
-    const isDeclaredScopa =
-      room.board.length > 0 && selectedBoardCards.length === room.board.length;
 
     const move: Move = {
       playerId: currentUserId,
