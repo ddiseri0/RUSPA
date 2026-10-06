@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Monitoraggio settimanale delle dipendenze npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    # Gestione e raggruppamento mirato per gli aggiornamenti di sicurezza
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
