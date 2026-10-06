@@ -23,7 +23,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 }) => {
   const [selectedHandCard, setSelectedHandCard] = useState<Card | null>(null);
   const [selectedBoardCards, setSelectedBoardCards] = useState<Card[]>([]);
-  const [isRuspaDeclared, setIsRuspaDeclared] = useState(false);
 
   if (!room || !room.players || !room.players[currentUserId]) {
     return (
@@ -42,79 +41,90 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const userHand = room.privateHands?.[currentUserId] || [];
   const isMyTurn = room.currentTurnPlayerId === currentUserId && room.phase === 'PLAYER_TURN';
 
-  // Toggle selection of target cards on the board
+  const currentSelectedSum = selectedBoardCards.reduce((acc, c) => acc + c.value, 0);
+
+  // Toggle selection of target cards on the board (somma max 10)
   const toggleBoardCard = (card: Card) => {
     if (!isMyTurn) return;
-    if (selectedBoardCards.find((c) => c.id === card.id)) {
+    const isAlreadySelected = selectedBoardCards.some((c) => c.id === card.id);
+    if (isAlreadySelected) {
       setSelectedBoardCards(selectedBoardCards.filter((c) => c.id !== card.id));
     } else {
+      // In Scopa la somma delle carte prese da terra non può mai superare 10
+      const currentSum = selectedBoardCards.reduce((acc, c) => acc + c.value, 0);
+      if (currentSum + card.value > 10) {
+        return;
+      }
       setSelectedBoardCards([...selectedBoardCards, card]);
     }
   };
 
   const isAce = selectedHandCard?.value === 1;
-  const isRuspaActive = Boolean(isAce || isRuspaDeclared);
 
-  // Submit move
-  const handleConfirmMove = () => {
+  // 1. Gioca Ruspa (Asso o Bluff diretto senza conferme)
+  const handlePlayRuspa = () => {
     if (!selectedHandCard || !isMyTurn) return;
-
-    if (isRuspaActive) {
-      // Ace is inherently Ruspa; or Bluff Ruspa active
-      const move: Move = {
-        playerId: currentUserId,
-        playerName: currentUser?.name || 'Giocatore',
-        playedCard: selectedHandCard,
-        targetCardIds: room.board.map((c) => c.id),
-        isRuspa: true,
-        isDiscardFaceUp: false,
-        timestamp: Date.now(),
-      };
-      onPlayMove(move);
-    } else if (selectedBoardCards.length > 0) {
-      // Single capture priority rule
-      const cartaSingolaPresente = room.board.some((c) => c.value === selectedHandCard.value);
-      if (cartaSingolaPresente && selectedBoardCards.length > 1) {
-        alert(
-          `Regola Ufficiale: È presente a terra una carta di valore ${selectedHandCard.value} (${getCardLabel(
-            selectedHandCard.value
-          )}). La presa della carta singola è obbligatoria rispetto alla somma!`
-        );
-        return;
-      }
-
-      // Normal Capture (covered move)
-      const move: Move = {
-        playerId: currentUserId,
-        playerName: currentUser?.name || 'Giocatore',
-        playedCard: selectedHandCard,
-        targetCardIds: selectedBoardCards.map((c) => c.id),
-        isRuspa: false,
-        isDiscardFaceUp: false,
-        timestamp: Date.now(),
-      };
-      onPlayMove(move);
-    } else {
-      // Discard Face-up
-      const move: Move = {
-        playerId: currentUserId,
-        playerName: currentUser?.name || 'Giocatore',
-        playedCard: selectedHandCard,
-        targetCardIds: [],
-        isRuspa: false,
-        isDiscardFaceUp: true,
-        timestamp: Date.now(),
-      };
-      onPlayMove(move);
-    }
-
-    // Reset local selection
+    const move: Move = {
+      playerId: currentUserId,
+      playerName: currentUser?.name || 'Giocatore',
+      playedCard: selectedHandCard,
+      targetCardIds: room.board.map((c) => c.id),
+      isRuspa: true,
+      isDiscardFaceUp: false,
+      timestamp: Date.now(),
+    };
+    onPlayMove(move);
     setSelectedHandCard(null);
     setSelectedBoardCards([]);
-    setIsRuspaDeclared(false);
   };
 
-  // Determine Opponent Player for top pill
+  // 2. Gioca Presa (Normale o Dichiara Scopa)
+  const handlePlayCapture = () => {
+    if (!selectedHandCard || !isMyTurn || selectedBoardCards.length === 0) return;
+
+    // Regola Ufficiale: Priorità Presa Singola
+    const cartaSingolaPresente = room.board.some((c) => c.value === selectedHandCard.value);
+    if (cartaSingolaPresente && selectedBoardCards.length > 1) {
+      alert(
+        `Regola Ufficiale: È presente a terra una carta di valore ${selectedHandCard.value} (${getCardLabel(
+          selectedHandCard.value
+        )}). La presa della carta singola è obbligatoria rispetto alla somma!`
+      );
+      return;
+    }
+
+    const move: Move = {
+      playerId: currentUserId,
+      playerName: currentUser?.name || 'Giocatore',
+      playedCard: selectedHandCard,
+      targetCardIds: selectedBoardCards.map((c) => c.id),
+      isRuspa: false,
+      isDiscardFaceUp: false,
+      timestamp: Date.now(),
+    };
+    onPlayMove(move);
+    setSelectedHandCard(null);
+    setSelectedBoardCards([]);
+  };
+
+  // 3. Scarta a terra (scoperta)
+  const handlePlayDiscard = () => {
+    if (!selectedHandCard || !isMyTurn) return;
+    const move: Move = {
+      playerId: currentUserId,
+      playerName: currentUser?.name || 'Giocatore',
+      playedCard: selectedHandCard,
+      targetCardIds: [],
+      isRuspa: false,
+      isDiscardFaceUp: true,
+      timestamp: Date.now(),
+    };
+    onPlayMove(move);
+    setSelectedHandCard(null);
+    setSelectedBoardCards([]);
+  };
+
+  // Opponent player for top pill
   const otherPlayers = Object.values(room.players).filter((p) => p.id !== currentUserId);
   const primaryOpponent = otherPlayers[0] || {
     id: 'opp_8',
@@ -130,6 +140,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const hasSelectedCard = Boolean(selectedHandCard && isMyTurn);
+  const isAllBoardSelected =
+    room.board.length > 0 && selectedBoardCards.length === room.board.length;
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full bg-black text-white flex flex-col justify-between p-3 sm:p-5 md:p-6 select-none overflow-hidden font-sans">
@@ -137,7 +149,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* TOP SECTION: Responsive Header & Opponent Card */}
       <div className="w-full max-w-4xl mx-auto flex flex-col shrink-0">
         
-        {/* Navigation Header: Back Chevron + Scopa Title & Room Subtitle + Deck Badge */}
+        {/* Navigation Header */}
         <div className="w-full flex items-center justify-between px-1 py-1">
           {/* Back Button `<` */}
           <button
@@ -150,7 +162,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               }
               onLeaveRoom();
             }}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#1C1C1E] border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors active:scale-95 shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#1C1C1E] border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors active:scale-95 shrink-0 cursor-pointer"
             title="Esci"
           >
             <svg
@@ -214,13 +226,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           ) : (
             room.board.map((card) => {
               const isTargeted = selectedBoardCards.some((c) => c.id === card.id);
+              const exceedsTenIfAdded = !isTargeted && (currentSelectedSum + card.value > 10);
+
               return (
                 <div key={card.id} className="relative transition-all duration-200">
                   <CardView
                     card={card}
                     targetSelected={isTargeted}
                     onClick={() => toggleBoardCard(card)}
-                    disabled={!isMyTurn}
+                    disabled={!isMyTurn || exceedsTenIfAdded}
                     size="md"
                   />
                 </div>
@@ -241,64 +255,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <div className="w-full max-w-2xl mx-auto px-2 flex items-center justify-center gap-3 my-2 z-20 shrink-0 min-h-[48px]">
         {hasSelectedCard && (
           isAce ? (
-            /* ASSELEZIONATO: L'Asso può fare solo Ruspa. Un unico pulsante chiaro! */
+            /* 1. SELEZIONATO UN ASSO: L'Asso può fare solo Ruspa. Unico pulsante presente! */
             <button
-              onClick={handleConfirmMove}
+              onClick={handlePlayRuspa}
               className="py-3 px-8 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-amber-400 text-black hover:bg-amber-300 shadow-glow-gold active:scale-95 transition-all cursor-pointer"
             >
-              Ruspa (Asso)
+              Ruspa
             </button>
-          ) : isRuspaDeclared ? (
-            /* BLUFF RUSPA ATTIVO: Azione per giocare il bluff + opzione per annullare */
-            <>
-              <button
-                onClick={handleConfirmMove}
-                className="py-3 px-7 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-amber-400 text-black hover:bg-amber-300 shadow-glow-gold active:scale-95 transition-all cursor-pointer"
-              >
-                Gioca come Ruspa (Bluff)
-              </button>
-              <button
-                onClick={() => {
-                  setIsRuspaDeclared(false);
-                }}
-                className="py-3 px-5 rounded-full font-medium text-xs sm:text-sm tracking-wide bg-[#1C1C1E] text-zinc-400 border border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
-              >
-                Annulla Bluff
-              </button>
-            </>
+          ) : isAllBoardSelected ? (
+            /* 2. TUTTE LE CARTE A TERRA SELEZIONATE: Unico pulsante presente è 'Dichiara Scopa' */
+            <button
+              onClick={handlePlayCapture}
+              className="py-3 px-8 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-[#C6EF68] text-black hover:bg-[#b5dc52] shadow-lg active:scale-95 transition-all cursor-pointer"
+            >
+              Dichiara Scopa
+            </button>
           ) : selectedBoardCards.length > 0 ? (
-            /* CARTA NORMALE + CARTE BERSAGLIO: Presa principale + Bluff Ruspa secondario */
-            <>
-              <button
-                onClick={handleConfirmMove}
-                className="py-3 px-7 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-white text-black hover:bg-zinc-200 shadow-lg active:scale-95 transition-all cursor-pointer"
-              >
-                Prendi {selectedBoardCards.length > 1 ? `${selectedBoardCards.length} Carte` : 'Carta'}
-              </button>
-              <button
-                onClick={() => {
-                  setIsRuspaDeclared(true);
-                  setSelectedBoardCards([]);
-                }}
-                className="py-3 px-5 rounded-full font-medium text-xs sm:text-sm tracking-wide bg-[#1C1C1E] text-zinc-300 border border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
-              >
-                Bluffa Ruspa
-              </button>
-            </>
+            /* 3. ALMENO UNA CARTA A TERRA SELEZIONATA: La ruspa sparisce, unico tasto è 'Prendi Carta' */
+            <button
+              onClick={handlePlayCapture}
+              className="py-3 px-8 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-white text-black hover:bg-zinc-200 shadow-lg active:scale-95 transition-all cursor-pointer"
+            >
+              Prendi {selectedBoardCards.length > 1 ? `${selectedBoardCards.length} Carte` : 'Carta'}
+            </button>
           ) : (
-            /* CARTA NORMALE + NESSUNA CARTA BERSAGLIO: Scarta a terra + Bluff Ruspa secondario */
+            /* 4. NESSUNA CARTA A TERRA SELEZIONATA: Scarta a terra oppure Bluffa Ruspa (esegue subito al click) */
             <>
               <button
-                onClick={handleConfirmMove}
+                onClick={handlePlayDiscard}
                 className="py-3 px-7 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-white text-black hover:bg-zinc-200 shadow-lg active:scale-95 transition-all cursor-pointer"
               >
                 Scarta a terra
               </button>
               <button
-                onClick={() => {
-                  setIsRuspaDeclared(true);
-                }}
-                className="py-3 px-5 rounded-full font-medium text-xs sm:text-sm tracking-wide bg-[#1C1C1E] text-zinc-300 border border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                onClick={handlePlayRuspa}
+                className="py-3 px-6 rounded-full font-medium text-xs sm:text-sm tracking-wide bg-[#1C1C1E] text-zinc-300 border border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
               >
                 Bluffa Ruspa
               </button>
@@ -314,7 +305,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div className="flex-1 flex items-end -space-x-3 sm:-space-x-4 md:-space-x-2 overflow-visible pl-0.5">
           {userHand.map((card, idx) => {
             const isSelected = selectedHandCard?.id === card.id;
-            // Fan rotation: left card -4deg, middle 0deg, right +4deg
+            // Fan rotation: left card -3.5deg, middle 0deg, right +3.5deg
             const rotationAngle = (idx - 1) * 3.5;
 
             return (
@@ -331,12 +322,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     if (!isMyTurn) return;
                     if (isSelected) {
                       setSelectedHandCard(null);
-                      setIsRuspaDeclared(false);
+                      setSelectedBoardCards([]);
                     } else {
                       setSelectedHandCard(card);
-                      if (card.value === 1) {
-                        setIsRuspaDeclared(false);
-                      }
                     }
                   }}
                   disabled={!isMyTurn}
