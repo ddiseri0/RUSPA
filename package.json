@@ -1,12 +1,13 @@
 {
   "name": "ruspa-poc",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "npx tsx scripts/test-regole.ts",
     "test:mcp": "node scripts/test-agent.mjs",
     "server": "npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=server/dist.mjs --external:socket.io --external:cors && node server/dist.mjs"
   },

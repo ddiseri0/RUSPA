@@ -9,6 +9,7 @@ import {
   submitCoveredMove,
   submitDubitoVote,
   leaveRoom,
+  continueFromMancheSummary,
 } from './services/firestoreSync';
 import { LobbyView } from './components/LobbyView';
 import { GameBoard } from './components/GameBoard';
@@ -135,10 +136,26 @@ export default function App() {
     }
   };
 
-  // Play covered card move
+  // Play card move with optimistic local hand update
   const handlePlayMove = async (move: Move) => {
     if (!currentRoom) return;
     try {
+      // Aggiornamento ottimistico immediato: la carta scompare all'istante dalla mano
+      const currentHand = currentRoom.privateHands?.[move.playerId] || [];
+      const updatedHand = currentHand.filter((c) => c.id !== move.playedCard.id);
+      const optimisticBoard = move.isDiscardFaceUp
+        ? [...currentRoom.board, move.playedCard]
+        : currentRoom.board;
+
+      setCurrentRoom({
+        ...currentRoom,
+        board: optimisticBoard,
+        privateHands: {
+          ...(currentRoom.privateHands || {}),
+          [move.playerId]: updatedHand,
+        },
+      });
+
       await submitCoveredMove(currentRoom.roomId, currentRoom, move);
     } catch (err: any) {
       setErrorMessage(err.message || 'Errore nella giocata della carta');
@@ -154,6 +171,189 @@ export default function App() {
       setErrorMessage(err.message || 'Errore durante la votazione');
     }
   };
+
+  // Continue to next manche (or game over) from end-of-manche summary
+  const handleContinueManche = async () => {
+    if (!currentRoom || !currentUser) return;
+    try {
+      await continueFromMancheSummary(currentRoom.roomId, currentRoom, currentUser.uid);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Errore durante la continuazione della manche');
+    }
+  };
+
+  // Automated Bot Move handler for bot turns
+  useEffect(() => {
+    if (
+      !currentRoom ||
+      currentRoom.phase !== 'PLAYER_TURN' ||
+      !currentRoom.currentTurnPlayerId ||
+      !currentRoom.currentTurnPlayerId.startsWith('bot_')
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const botId = currentRoom.currentTurnPlayerId;
+      const botHand = currentRoom.privateHands?.[botId] || [];
+      if (botHand.length === 0) return;
+
+      const botPlayer = currentRoom.players[botId];
+      const board = currentRoom.board || [];
+
+      // 1. Asso -> Ruspa sul tavolo
+      const ace = botHand.find((c) => c.value === 1);
+      if (ace && board.length > 0) {
+        const move: Move = {
+          playerId: botId,
+          playerName: botPlayer?.name || 'Giocatore 8',
+          playedCard: ace,
+          targetCardIds: board.map((c) => c.id),
+          isRuspa: true,
+          isDiscardFaceUp: false,
+          timestamp: Date.now(),
+        };
+        await handlePlayMove(move);
+        return;
+      }
+
+      // 2. Presa Singola (Regola prioritaria ufficiale Scopa)
+      for (const card of botHand) {
+        const matchingBoardCard = board.find((c) => c.value === card.value);
+        if (matchingBoardCard) {
+          const isDeclaredScopa = board.length === 1;
+          const move: Move = {
+            playerId: botId,
+            playerName: botPlayer?.name || 'Giocatore 8',
+            playedCard: card,
+            targetCardIds: [matchingBoardCard.id],
+            isRuspa: false,
+            isDiscardFaceUp: false,
+            isDeclaredScopa,
+            timestamp: Date.now(),
+          };
+          await handlePlayMove(move);
+          return;
+        }
+      }
+
+      // 3. Presa a Somma (2 o più carte a terra)
+      for (const card of botHand) {
+        // Somma di 2 carte
+        for (let i = 0; i < board.length; i++) {
+          for (let j = i + 1; j < board.length; j++) {
+            if (board[i].value + board[j].value === card.value) {
+              const targetCardIds = [board[i].id, board[j].id];
+              const isDeclaredScopa = board.length === 2;
+              const move: Move = {
+                playerId: botId,
+                playerName: botPlayer?.name || 'Giocatore 8',
+                playedCard: card,
+                targetCardIds,
+                isRuspa: false,
+                isDiscardFaceUp: false,
+                isDeclaredScopa,
+                timestamp: Date.now(),
+              };
+              await handlePlayMove(move);
+              return;
+            }
+          }
+        }
+
+        // Somma di 3 carte
+        for (let i = 0; i < board.length; i++) {
+          for (let j = i + 1; j < board.length; j++) {
+            for (let k = j + 1; k < board.length; k++) {
+              if (board[i].value + board[j].value + board[k].value === card.value) {
+                const targetCardIds = [board[i].id, board[j].id, board[k].id];
+                const isDeclaredScopa = board.length === 3;
+                const move: Move = {
+                  playerId: botId,
+                  playerName: botPlayer?.name || 'Giocatore 8',
+                  playedCard: card,
+                  targetCardIds,
+                  isRuspa: false,
+                  isDiscardFaceUp: false,
+                  isDeclaredScopa,
+                  timestamp: Date.now(),
+                };
+                await handlePlayMove(move);
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Nessuna presa possibile -> Scarto a terra scoperto
+      const discardCard = botHand[0];
+      const move: Move = {
+        playerId: botId,
+        playerName: botPlayer?.name || 'Giocatore 8',
+        playedCard: discardCard,
+        targetCardIds: [],
+        isRuspa: false,
+        isDiscardFaceUp: true,
+        timestamp: Date.now(),
+      };
+      await handlePlayMove(move);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [currentRoom]);
+
+  // Automated Bot Dubito Vote handler
+  useEffect(() => {
+    if (
+      !currentRoom ||
+      currentRoom.phase !== 'DUBITO_WINDOW' ||
+      !currentRoom.dubitoState
+    ) {
+      return;
+    }
+
+    const { dubitoState } = currentRoom;
+    const botIds = Object.keys(currentRoom.players).filter((id) => id.startsWith('bot_'));
+    const pendingBot = botIds.find(
+      (id) =>
+        currentRoom.players[id]?.team === dubitoState.targetTeam &&
+        !dubitoState.votes[id]
+    );
+
+    if (!pendingBot) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const isScopa =
+          Boolean(dubitoState.move.isDeclaredScopa) ||
+          (!dubitoState.move.isRuspa &&
+            dubitoState.move.targetCardIds.length === currentRoom.board.length &&
+            currentRoom.board.length > 0);
+        const isRuspa = Boolean(dubitoState.move.isRuspa);
+
+        // Intelligenza di voto del Bot:
+        // - Su Scopa: dubita con alta probabilità (65%) per sfidare e consentire il momento SCOPAE
+        // - Su Ruspa: dubita con alta probabilità (65%) per smascherare bluff
+        // - Su presa normale: dubita casualmente (25%)
+        let botVote: 'DUBITO' | 'PASSA' = 'PASSA';
+        const rand = Math.random();
+        if (isScopa) {
+          botVote = rand < 0.65 ? 'DUBITO' : 'PASSA';
+        } else if (isRuspa) {
+          botVote = rand < 0.65 ? 'DUBITO' : 'PASSA';
+        } else {
+          botVote = rand < 0.25 ? 'DUBITO' : 'PASSA';
+        }
+
+        await submitDubitoVote(currentRoom.roomId, currentRoom, pendingBot, botVote);
+      } catch (err) {
+        console.warn('Bot vote error:', err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentRoom]);
 
   // Register WebMCP bridge for agent automation and testing
   useEffect(() => {
@@ -223,6 +423,7 @@ export default function App() {
           currentUserId={currentUser.uid}
           onPlayMove={handlePlayMove}
           onDubitoVote={handleDubitoVote}
+          onContinueManche={handleContinueManche}
           onLeaveRoom={handleLeaveRoom}
         />
       ) : (
