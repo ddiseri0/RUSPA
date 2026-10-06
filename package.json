@@ -33,7 +33,7 @@
     "socket.io-client": "^4.8.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.2.2",
+    "typescript": "^7.0.2",
     "vite": "^5.4.14"
   },
   "overrides": {
