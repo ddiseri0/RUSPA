@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Le stanze di gioco possono essere lette e scritte solo da utenti autenticati (inclusa autenticazione anonima)
+    match /rooms/{roomId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Blocca l'accesso a qualsiasi altra collezione non esplicitamente consentita
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
