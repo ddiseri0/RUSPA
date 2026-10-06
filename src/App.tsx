@@ -9,6 +9,7 @@ import {
   submitCoveredMove,
   submitDubitoVote,
   leaveRoom,
+  continueFromMancheSummary,
 } from './services/firestoreSync';
 import { LobbyView } from './components/LobbyView';
 import { GameBoard } from './components/GameBoard';
@@ -168,6 +169,16 @@ export default function App() {
       await submitDubitoVote(currentRoom.roomId, currentRoom, currentUser.uid, vote);
     } catch (err: any) {
       setErrorMessage(err.message || 'Errore durante la votazione');
+    }
+  };
+
+  // Continue to next manche (or game over) from end-of-manche summary
+  const handleContinueManche = async () => {
+    if (!currentRoom || !currentUser) return;
+    try {
+      await continueFromMancheSummary(currentRoom.roomId, currentRoom, currentUser.uid);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Errore durante la continuazione della manche');
     }
   };
 
@@ -412,6 +423,7 @@ export default function App() {
           currentUserId={currentUser.uid}
           onPlayMove={handlePlayMove}
           onDubitoVote={handleDubitoVote}
+          onContinueManche={handleContinueManche}
           onLeaveRoom={handleLeaveRoom}
         />
       ) : (

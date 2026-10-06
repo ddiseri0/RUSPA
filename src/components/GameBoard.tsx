@@ -4,6 +4,7 @@ import { CardView } from './CardView';
 import { CardBack } from './CardBack';
 import { PlayerTopPill, PlayerSquareCard } from './PlayerAvatar';
 import { DubitoModal } from './DubitoModal';
+import { MancheSummaryModal } from './MancheSummaryModal';
 import { ScopaeAnimation } from './ScopaeAnimation';
 import { getCardLabel } from '../engine/scopaRules';
 
@@ -12,6 +13,7 @@ interface GameBoardProps {
   currentUserId: string;
   onPlayMove: (move: Move) => void;
   onDubitoVote: (vote: 'DUBITO' | 'PASSA') => void;
+  onContinueManche?: () => void;
   onLeaveRoom: () => void;
 }
 
@@ -20,6 +22,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   currentUserId,
   onPlayMove,
   onDubitoVote,
+  onContinueManche,
   onLeaveRoom,
 }) => {
   const [selectedHandCard, setSelectedHandCard] = useState<Card | null>(null);
@@ -370,6 +373,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           boardCards={room.board}
           mode={room.mode}
           onVote={onDubitoVote}
+        />
+      )}
+
+      {/* End of Manche Summary Modal */}
+      {room.phase === 'ROUND_OVER' && room.mancheDetail && (
+        <MancheSummaryModal
+          detail={room.mancheDetail}
+          currentUserId={currentUserId}
+          players={room.players}
+          isHost={room.hostId === currentUserId}
+          onContinue={onContinueManche || (() => {})}
         />
       )}
 

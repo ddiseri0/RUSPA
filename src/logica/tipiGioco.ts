@@ -135,20 +135,63 @@ export interface EsitoPuntiManche {
   squadra1: {
     scope: number;
     carte: number;
+    carteCount: number;
     denari: number;
+    denariCount: number;
     settebello: number;
+    haSettebello: boolean;
     primiera: number;
+    primieraScore: number;
     totaleAggiunto: number;
   };
   squadra2: {
     scope: number;
     carte: number;
+    carteCount: number;
     denari: number;
+    denariCount: number;
     settebello: number;
+    haSettebello: boolean;
     primiera: number;
+    primieraScore: number;
     totaleAggiunto: number;
   };
   riepilogo: string[];
+}
+
+export interface MancheDetail {
+  mancheNumber: number;
+  isGameOver: boolean;
+  squadra1: {
+    name: string;
+    scope: number;
+    carte: number;
+    carteCount: number;
+    denari: number;
+    denariCount: number;
+    settebello: number;
+    haSettebello: boolean;
+    primiera: number;
+    primieraScore: number;
+    totaleAggiunto: number;
+    totaleProgressivo: number;
+  };
+  squadra2: {
+    name: string;
+    scope: number;
+    carte: number;
+    carteCount: number;
+    denari: number;
+    denariCount: number;
+    settebello: number;
+    haSettebello: boolean;
+    primiera: number;
+    primieraScore: number;
+    totaleAggiunto: number;
+    totaleProgressivo: number;
+  };
+  riepilogo: string[];
+  readyPlayers?: Record<string, boolean>;
 }
 
 export interface RoomState {
@@ -173,6 +216,7 @@ export interface RoomState {
     score: number;
   } | null;
   lastMancheSummary?: string[];
+  mancheDetail?: MancheDetail | null;
   pendingMove: Move | null;
   dubitoState: DubitoState | null;
   scopaeEvent?: {

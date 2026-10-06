@@ -11,7 +11,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../lib/firebase';
-import { RoomState, Player, Move, GameMode, Card, DubitoState } from '../types/game';
+import { RoomState, Player, Move, GameMode, Card, DubitoState, MancheDetail } from '../types/game';
 import {
   preparaDistribuzioneIniziale,
   verifyCaptureLegitimacy,
@@ -1012,9 +1012,103 @@ export async function advanceGameAfterMove(
   // Check victory condition: >= 21 points
   const isGameOver = (totalScore1 >= 21 || totalScore2 >= 21) && totalScore1 !== totalScore2;
 
-  if (isGameOver) {
+  const team1Name = team1Players.map((p) => p.name).join(' & ') || 'Squadra 1';
+  const team2Name = team2Players.map((p) => p.name).join(' & ') || 'Squadra 2';
+
+  const mancheDetail: MancheDetail = {
+    mancheNumber: currentManche,
+    isGameOver,
+    squadra1: {
+      name: team1Name,
+      scope: mancheResult.p1Points.scope,
+      carte: mancheResult.p1Points.carte,
+      carteCount: mancheResult.p1Points.carteCount,
+      denari: mancheResult.p1Points.denari,
+      denariCount: mancheResult.p1Points.denariCount,
+      settebello: mancheResult.p1Points.settebello,
+      haSettebello: mancheResult.p1Points.haSettebello,
+      primiera: mancheResult.p1Points.primiera,
+      primieraScore: mancheResult.p1Points.primieraScore,
+      totaleAggiunto: mancheResult.p1Points.totalAdded,
+      totaleProgressivo: totalScore1,
+    },
+    squadra2: {
+      name: team2Name,
+      scope: mancheResult.p2Points.scope,
+      carte: mancheResult.p2Points.carte,
+      carteCount: mancheResult.p2Points.carteCount,
+      denari: mancheResult.p2Points.denari,
+      denariCount: mancheResult.p2Points.denariCount,
+      settebello: mancheResult.p2Points.settebello,
+      haSettebello: mancheResult.p2Points.haSettebello,
+      primiera: mancheResult.p2Points.primiera,
+      primieraScore: mancheResult.p2Points.primieraScore,
+      totaleAggiunto: mancheResult.p2Points.totalAdded,
+      totaleProgressivo: totalScore2,
+    },
+    riepilogo: mancheResult.summary,
+    readyPlayers: {},
+  };
+
+  // Transition to ROUND_OVER: display the end-of-manche summary modal to all multiplayer participants
+  await updateRoomData(roomId, {
+    phase: 'ROUND_OVER',
+    pendingMove: null,
+    dubitoState: null,
+    board: [],
+    players: finalPlayers,
+    capturedPiles: finalCapturedPiles,
+    mancheDetail,
+    lastMancheSummary: mancheResult.summary,
+    lastActionMessage: `Fine Manche ${currentManche}! Punti assegnati: ${summaryText}.`,
+    updatedAt: Date.now(),
+  });
+}
+
+/**
+ * Handles player clicking "Continua" on the MancheSummaryModal.
+ * Synchronizes readiness between multiplayer participants.
+ * Once all players are ready (or host forces start), starts the next manche or ends the game.
+ */
+export async function continueFromMancheSummary(
+  roomId: string,
+  currentRoom: RoomState,
+  playerId: string
+): Promise<void> {
+  const detail = currentRoom.mancheDetail;
+  if (!detail) return;
+
+  const currentReady = detail.readyPlayers || {};
+  const isHost = currentRoom.hostId === playerId;
+  const alreadyReady = Boolean(currentReady[playerId]);
+
+  const updatedReady = {
+    ...currentReady,
+    [playerId]: true,
+  };
+
+  // Only count human players for multiplayer synchronization
+  const humanPlayers = Object.keys(currentRoom.players).filter((pid) => !pid.startsWith('bot_'));
+  const readyCount = humanPlayers.filter((pid) => updatedReady[pid]).length;
+  const shouldProceed = readyCount >= humanPlayers.length || (isHost && alreadyReady);
+
+  if (!shouldProceed) {
+    await updateRoomData(roomId, {
+      mancheDetail: {
+        ...detail,
+        readyPlayers: updatedReady,
+      },
+      updatedAt: Date.now(),
+    });
+    return;
+  }
+
+  // All players ready or host forced proceed!
+  if (detail.isGameOver) {
+    const totalScore1 = detail.squadra1.totaleProgressivo;
+    const totalScore2 = detail.squadra2.totaleProgressivo;
     const winningTeam: 1 | 2 = totalScore1 > totalScore2 ? 1 : 2;
-    const winners = Object.values(finalPlayers).filter((p) => p.team === winningTeam);
+    const winners = Object.values(currentRoom.players).filter((p) => p.team === winningTeam);
     const winnerData = {
       team: winningTeam,
       winnerNames: winners.map((w) => w.name),
@@ -1026,46 +1120,55 @@ export async function advanceGameAfterMove(
       pendingMove: null,
       dubitoState: null,
       board: [],
-      players: finalPlayers,
-      capturedPiles: finalCapturedPiles,
       winner: winnerData,
-      lastMancheSummary: mancheResult.summary,
-      lastActionMessage: `🏆 VITTORIA! ${winnerData.winnerNames.join(' & ')} vincono la partita con ${winnerData.score} punti! (${summaryText})`,
+      mancheDetail: null,
+      lastActionMessage: `🏆 VITTORIA! ${winnerData.winnerNames.join(' & ')} vincono la partita con ${winnerData.score} punti!`,
       updatedAt: Date.now(),
     });
     return;
   }
 
-  // Not game over -> Start new manche!
-  // Dealer rotates clockwise
+  await startNextManche(roomId, currentRoom);
+}
+
+/**
+ * Initializes and deals a fresh manche.
+ * Rotates the dealer, resets per-manche scope counters, deals 3 cards to each player and 4 to the board.
+ */
+export async function startNextManche(roomId: string, room: RoomState): Promise<void> {
   const turnOrder = room.turnOrder;
   const nextDealerIndex = ((room.dealerIndex || 0) + 1) % turnOrder.length;
-  // Primo di mano ruota al giocatore successivo
+  // Primo di mano ruota al giocatore successivo al mazziere
   const firstPlayerId = turnOrder[(nextDealerIndex + 1) % turnOrder.length];
 
   const { mazzo: freshDeck, tavolo: freshBoard } = preparaDistribuzioneIniziale();
   const freshPrivateHands: Record<string, Card[]> = {};
   const resetCapturedPiles: Record<string, Card[]> = {};
+  const updatedPlayers: Record<string, Player> = { ...room.players };
 
   turnOrder.forEach((pid) => {
     freshPrivateHands[pid] = freshDeck.splice(0, 3);
-    finalPlayers[pid] = {
-      ...finalPlayers[pid],
-      handCount: freshPrivateHands[pid].length,
-      capturedCount: 0,
-    };
+    if (updatedPlayers[pid]) {
+      updatedPlayers[pid] = {
+        ...updatedPlayers[pid],
+        handCount: freshPrivateHands[pid].length,
+        capturedCount: 0,
+        scopaCount: 0, // Reset scopa count per manche
+      };
+    }
     resetCapturedPiles[pid] = [];
   });
 
+  const currentManche = room.mancheNumber || 1;
   const nextManche = currentManche + 1;
-  const dealerName = finalPlayers[turnOrder[nextDealerIndex]]?.name || 'Mazziere';
+  const dealerName = updatedPlayers[turnOrder[nextDealerIndex]]?.name || 'Mazziere';
 
   await updateRoomData(roomId, {
     phase: 'PLAYER_TURN',
     pendingMove: null,
     dubitoState: null,
     board: freshBoard,
-    players: finalPlayers,
+    players: updatedPlayers,
     privateHands: freshPrivateHands,
     deck: freshDeck,
     deckRemaining: freshDeck.length,
@@ -1074,8 +1177,8 @@ export async function advanceGameAfterMove(
     mancheNumber: nextManche,
     currentTurnPlayerId: firstPlayerId,
     lastCapturePlayerId: null,
-    lastMancheSummary: mancheResult.summary,
-    lastActionMessage: `Fine Manche ${currentManche}! Punti assegnati: ${summaryText}. Inizia la Manche ${nextManche}! Mazziere di turno: ${dealerName}.`,
+    mancheDetail: null,
+    lastActionMessage: `Inizia la Manche ${nextManche}! Mazziere: ${dealerName}.`,
     updatedAt: Date.now(),
   });
 }

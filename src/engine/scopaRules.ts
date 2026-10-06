@@ -77,17 +77,25 @@ export interface ManchePointsResult {
   p1Points: {
     scope: number;
     carte: number;
+    carteCount: number;
     denari: number;
+    denariCount: number;
     settebello: number;
+    haSettebello: boolean;
     primiera: number;
+    primieraScore: number;
     totalAdded: number;
   };
   p2Points: {
     scope: number;
     carte: number;
+    carteCount: number;
     denari: number;
+    denariCount: number;
     settebello: number;
+    haSettebello: boolean;
     primiera: number;
+    primieraScore: number;
     totalAdded: number;
   };
   summary: string[];
@@ -104,17 +112,25 @@ export function evaluateManchePoints(
     p1Points: {
       scope: esito.squadra1.scope,
       carte: esito.squadra1.carte,
+      carteCount: esito.squadra1.carteCount,
       denari: esito.squadra1.denari,
+      denariCount: esito.squadra1.denariCount,
       settebello: esito.squadra1.settebello,
+      haSettebello: esito.squadra1.haSettebello,
       primiera: esito.squadra1.primiera,
+      primieraScore: esito.squadra1.primieraScore,
       totalAdded: esito.squadra1.totaleAggiunto,
     },
     p2Points: {
       scope: esito.squadra2.scope,
       carte: esito.squadra2.carte,
+      carteCount: esito.squadra2.carteCount,
       denari: esito.squadra2.denari,
+      denariCount: esito.squadra2.denariCount,
       settebello: esito.squadra2.settebello,
+      haSettebello: esito.squadra2.haSettebello,
       primiera: esito.squadra2.primiera,
+      primieraScore: esito.squadra2.primieraScore,
       totalAdded: esito.squadra2.totaleAggiunto,
     },
     summary: esito.riepilogo,
