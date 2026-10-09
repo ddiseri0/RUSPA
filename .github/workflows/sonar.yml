@@ -12,6 +12,7 @@ jobs:
   sonarcloud:
     name: SonarCloud Code Analysis
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - name: Checkout repository (full git history)
