@@ -1,17 +1,85 @@
 version: 2
 updates:
-  # Monitoraggio settimanale delle dipendenze npm
+  # Monitoraggio mensile delle dipendenze npm
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "security"
-    # Gestione e raggruppamento mirato per gli aggiornamenti di sicurezza
+
+    # Raggruppamento delle richieste di unione
     groups:
+      # Aggiornamenti di routine aggregati (minor e patch)
+      routine-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Correzioni tempestive per vulnerabilità critiche
       security-updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+    # Protezione delle dipendenze critiche contro salti di versione maggiori (major)
+    ignore:
+      # React ecosystem
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+
+      # Build system & bundler
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+
+      # Styling ecosystem
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "postcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "autoprefixer"
+        update-types: ["version-update:semver-major"]
+
+      # TypeScript runtime & compiler
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ts-node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tsx"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+      # Real-time WebSocket communication
+      - dependency-name: "socket.io"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "socket.io-client"
+        update-types: ["version-update:semver-major"]
+
+      # Backend & Database
+      - dependency-name: "firebase"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "cors"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/cors"
+        update-types: ["version-update:semver-major"]
+
+      # Component libraries
+      - dependency-name: "lucide-react"
+        update-types: ["version-update:semver-major"]
