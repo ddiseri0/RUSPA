@@ -26,17 +26,24 @@ const CHIAVE_ID_GIOCATORE = 'ruspa_socket_player_id';
 
 export type StatoConnessione = 'connesso' | 'riconnessione' | 'disconnesso';
 
+function generaTokenSicuro(prefisso: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefisso}_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
+  }
+  return `${prefisso}_${Date.now().toString(36)}`;
+}
+
 function ottieniIdGiocatoreStabile(): string {
   let id = sessionStorage.getItem(CHIAVE_ID_GIOCATORE);
   if (!id) {
-    id = 'sck_' + Math.random().toString(36).substring(2, 11);
+    id = generaTokenSicuro('sck');
     sessionStorage.setItem(CHIAVE_ID_GIOCATORE, id);
   }
   return id;
 }
 
 function generaIdMossa(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+  return generaTokenSicuro('mov');
 }
 
 export function useMultiplayerGame() {
@@ -81,7 +88,7 @@ export function useMultiplayerGame() {
     newSocket.on('game_state', (newState: ClientGameState) => {
       const corrente = statoConfermatoRef.current;
       // Scarta stati obsoleti consegnati fuori ordine (es. buffer di una connessione precedente).
-      if (corrente && corrente.roomId === newState.roomId && newState.version < corrente.version) {
+      if (corrente?.roomId === newState.roomId && newState.version < corrente.version) {
         return;
       }
       statoConfermatoRef.current = newState;

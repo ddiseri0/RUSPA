@@ -63,28 +63,69 @@ function notifyLocalListeners(roomId: string, room: RoomState) {
   }
 }
 
+function sanificaIdStanza(input: string): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 64);
+}
+
+function calcolaSquadra(modo: GameMode, posto: number): 1 | 2 {
+  if (modo === '2v2') {
+    return posto % 2 === 0 ? 1 : 2;
+  }
+  return posto === 0 ? 1 : 2;
+}
+
+function ottieniNumeroCasualeSicuro(massimoEscluso: number): number {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0] % massimoEscluso;
+  }
+  return Math.floor(Math.random() * massimoEscluso);
+}
+
+function ottieniFloatCasuale(): number {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0] / (0xffffffff + 1);
+  }
+  return Math.random();
+}
+
 function saveLocalRoom(roomId: string, code: string, room: RoomState) {
-  localRooms.set(roomId, room);
-  localRooms.set(code, room);
+  const safeRoomId = sanificaIdStanza(roomId);
+  const safeCode = sanificaIdStanza(code);
+  if (!safeRoomId) return;
+
+  localRooms.set(safeRoomId, room);
+  if (safeCode) localRooms.set(safeCode, room);
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
-      localStorage.setItem(`ruspa_room_${roomId}`, JSON.stringify(room));
-      localStorage.setItem(`ruspa_code_${code}`, roomId);
+      localStorage.setItem(`ruspa_room_${safeRoomId}`, JSON.stringify(room));
+      if (safeCode) {
+        localStorage.setItem(`ruspa_code_${safeCode}`, safeRoomId);
+      }
     } catch {}
   }
-  syncChannel?.postMessage({ type: 'SYNC_ROOM', roomId, room });
-  notifyLocalListeners(roomId, room);
+  syncChannel?.postMessage({ type: 'SYNC_ROOM', roomId: safeRoomId, room });
+  notifyLocalListeners(safeRoomId, room);
 }
 
 function getLocalRoom(codeOrId: string): RoomState | null {
-  const clean = codeOrId.trim().toUpperCase();
+  const safeInput = sanificaIdStanza(codeOrId);
+  if (!safeInput) return null;
+  const clean = safeInput.toUpperCase();
   if (localRooms.has(clean)) return localRooms.get(clean)!;
   if (localRooms.has('room_' + clean.toLowerCase()))
     return localRooms.get('room_' + clean.toLowerCase())!;
 
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
-      const mappedId = localStorage.getItem(`ruspa_code_${clean}`);
+      const mappedId = sanificaIdStanza(localStorage.getItem(`ruspa_code_${clean}`) || '');
       const raw =
         localStorage.getItem(`ruspa_room_${mappedId || clean}`) ||
         localStorage.getItem(`ruspa_room_room_${clean.toLowerCase()}`);
@@ -106,7 +147,7 @@ export function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(ottieniNumeroCasualeSicuro(chars.length));
   }
   return result;
 }
@@ -172,7 +213,9 @@ export async function createRoom(host: Player, mode: GameMode): Promise<RoomStat
  * Joins an existing room by code or ID
  */
 export async function joinRoom(roomCodeOrId: string, player: Player): Promise<RoomState | null> {
-  const cleanKey = roomCodeOrId.trim().toUpperCase();
+  const safeKey = sanificaIdStanza(roomCodeOrId);
+  if (!safeKey) return null;
+  const cleanKey = safeKey.toUpperCase();
 
   if (isFirebaseConfigured && db) {
     // Search by code or by direct document ID
@@ -200,7 +243,7 @@ export async function joinRoom(roomCodeOrId: string, player: Player): Promise<Ro
 
     // Determine team and seat
     const seat = currentCount;
-    const team: 1 | 2 = room.mode === '2v2' ? (seat % 2 === 0 ? 1 : 2) : seat === 0 ? 1 : 2;
+    const team: 1 | 2 = calcolaSquadra(room.mode, seat);
 
     const updatedPlayers = {
       ...room.players,
@@ -236,7 +279,7 @@ export async function joinRoom(roomCodeOrId: string, player: Player): Promise<Ro
     if (!room && typeof window !== 'undefined') {
       // Fetch from dev server hub (allows Incognito window to find room created in normal window)
       try {
-        const res = await fetch(`/__api/rooms/${cleanKey}`);
+        const res = await fetch(`/__api/rooms/${encodeURIComponent(cleanKey)}`);
         if (res.ok) {
           room = await res.json();
         }
@@ -248,7 +291,7 @@ export async function joinRoom(roomCodeOrId: string, player: Player): Promise<Ro
 
     const currentCount = Object.keys(room.players).length;
     const seat = currentCount;
-    const team: 1 | 2 = room.mode === '2v2' ? (seat % 2 === 0 ? 1 : 2) : 2;
+    const team: 1 | 2 = calcolaSquadra(room.mode, seat);
 
     room.players[player.id] = {
       ...player,
@@ -359,112 +402,136 @@ const RITARDO_MASSIMO_RISOTTOSCRIZIONE_MS = 30000;
  * - Dopo la disiscrizione nessuna callback può più raggiungere la UI (flag `attivo`),
  *   evitando setState su componenti smontati e listener fantasma.
  */
-export function subscribeToRoom(
+function sottoscriviStanzaFirestore(
   roomId: string,
   onUpdate: (room: RoomState) => void,
   onError?: (err: Error) => void
 ): Unsubscribe {
   let attivo = true;
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
+  let annullaSnapshot: Unsubscribe | null = null;
+  let timerRiprova: ReturnType<typeof setTimeout> | null = null;
+  let tentativi = 0;
+
+  const sottoscrivi = () => {
+    if (!attivo) return;
+    annullaSnapshot = onSnapshot(
+      roomRef,
+      snapshot => {
+        if (!attivo) return;
+        tentativi = 0;
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data() as RoomState);
+        }
+      },
+      error => {
+        if (!attivo) return;
+        registraErrore('Firestore listener error:', error);
+        annullaSnapshot = null;
+        if (error.code === 'permission-denied' && tentativi >= 3) {
+          onError?.(error);
+          return;
+        }
+        const ritardo = Math.min(
+          RITARDO_MASSIMO_RISOTTOSCRIZIONE_MS,
+          RITARDO_BASE_RISOTTOSCRIZIONE_MS * 2 ** tentativi
+        );
+        tentativi++;
+        timerRiprova = setTimeout(sottoscrivi, ritardo * (0.75 + ottieniFloatCasuale() * 0.5));
+      }
+    );
+  };
+
+  sottoscrivi();
+
+  return () => {
+    attivo = false;
+    if (timerRiprova) clearTimeout(timerRiprova);
+    annullaSnapshot?.();
+    annullaSnapshot = null;
+  };
+}
+
+function sottoscriviStanzaLocale(roomId: string, onUpdate: (room: RoomState) => void): Unsubscribe {
+  let attivo = true;
+  const onUpdateProtetto = (r: RoomState) => {
+    if (attivo) onUpdate(r);
+  };
+  if (!localListeners.has(roomId)) {
+    localListeners.set(roomId, new Set());
+  }
+  localListeners.get(roomId)!.add(onUpdateProtetto);
+
+  const room = getLocalRoom(roomId);
+  let timerIniziale: ReturnType<typeof setTimeout> | null = null;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  if (room) {
+    timerIniziale = setTimeout(() => onUpdateProtetto({ ...room }), 0);
+  } else if (typeof window !== 'undefined') {
+    fetch(`/__api/rooms/${encodeURIComponent(roomId)}`, { signal: controller?.signal })
+      .then(r => r.json())
+      .then(r => {
+        if (attivo && r?.roomId) {
+          saveLocalRoom(r.roomId, r.code, r);
+        }
+      })
+      .catch(() => {});
+  }
+
+  // Connect Server-Sent Events stream from dev server for real-time cross-window sync
+  let eventSource: EventSource | null = null;
+  if (typeof window !== 'undefined' && 'EventSource' in window) {
+    try {
+      eventSource = new EventSource(`/__api/rooms/${encodeURIComponent(roomId)}/events`);
+      eventSource.onmessage = event => {
+        try {
+          const updated = JSON.parse(event.data);
+          if (updated && updated.roomId === roomId) {
+            localRooms.set(roomId, updated);
+            localRooms.set(updated.code, updated);
+            notifyLocalListeners(roomId, updated);
+          }
+        } catch {}
+      };
+    } catch {}
+  }
+
+  return () => {
+    attivo = false;
+    if (timerIniziale) clearTimeout(timerIniziale);
+    controller?.abort();
+    const insieme = localListeners.get(roomId);
+    insieme?.delete(onUpdateProtetto);
+    if (insieme?.size === 0) localListeners.delete(roomId);
+    if (eventSource) {
+      eventSource.close();
+    }
+  };
+}
+
+/**
+ * Subscribes to realtime updates of a room
+ *
+ * Ciclo di vita del listener:
+ * - Un errore di `onSnapshot` è terminale (il listener viene chiuso dall'SDK, es. token Auth
+ *   scaduto durante un cambio di rete): si riattiva con backoff esponenziale e jitter.
+ * - Dopo la disiscrizione nessuna callback può più raggiungere la UI (flag `attivo`),
+ *   evitando setState su componenti smontati e listener fantasma.
+ */
+export function subscribeToRoom(
+  roomId: string,
+  onUpdate: (room: RoomState) => void,
+  onError?: (err: Error) => void
+): Unsubscribe {
+  const safeId = sanificaIdStanza(roomId);
+  if (!safeId) {
+    return () => {};
+  }
 
   if (isFirebaseConfigured && db) {
-    const roomRef = doc(db, ROOMS_COLLECTION, roomId);
-    let annullaSnapshot: Unsubscribe | null = null;
-    let timerRiprova: ReturnType<typeof setTimeout> | null = null;
-    let tentativi = 0;
-
-    const sottoscrivi = () => {
-      if (!attivo) return;
-      annullaSnapshot = onSnapshot(
-        roomRef,
-        snapshot => {
-          if (!attivo) return;
-          tentativi = 0;
-          if (snapshot.exists()) {
-            onUpdate(snapshot.data() as RoomState);
-          }
-        },
-        error => {
-          if (!attivo) return;
-          registraErrore('Firestore listener error:', error);
-          annullaSnapshot = null;
-          if (error.code === 'permission-denied' && tentativi >= 3) {
-            onError?.(error);
-            return;
-          }
-          const ritardo = Math.min(
-            RITARDO_MASSIMO_RISOTTOSCRIZIONE_MS,
-            RITARDO_BASE_RISOTTOSCRIZIONE_MS * 2 ** tentativi
-          );
-          tentativi++;
-          timerRiprova = setTimeout(sottoscrivi, ritardo * (0.75 + Math.random() * 0.5));
-        }
-      );
-    };
-
-    sottoscrivi();
-
-    return () => {
-      attivo = false;
-      if (timerRiprova) clearTimeout(timerRiprova);
-      annullaSnapshot?.();
-      annullaSnapshot = null;
-    };
-  } else {
-    // Local subscriber
-    const onUpdateProtetto = (r: RoomState) => {
-      if (attivo) onUpdate(r);
-    };
-    if (!localListeners.has(roomId)) {
-      localListeners.set(roomId, new Set());
-    }
-    localListeners.get(roomId)!.add(onUpdateProtetto);
-
-    const room = getLocalRoom(roomId);
-    let timerIniziale: ReturnType<typeof setTimeout> | null = null;
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    if (room) {
-      timerIniziale = setTimeout(() => onUpdateProtetto({ ...room }), 0);
-    } else if (typeof window !== 'undefined') {
-      fetch(`/__api/rooms/${roomId}`, { signal: controller?.signal })
-        .then(r => r.json())
-        .then(r => {
-          if (attivo && r && r.roomId) {
-            saveLocalRoom(r.roomId, r.code, r);
-          }
-        })
-        .catch(() => {});
-    }
-
-    // Connect Server-Sent Events stream from dev server for real-time cross-window sync
-    let eventSource: EventSource | null = null;
-    if (typeof window !== 'undefined' && 'EventSource' in window) {
-      try {
-        eventSource = new EventSource(`/__api/rooms/${roomId}/events`);
-        eventSource.onmessage = event => {
-          try {
-            const updated = JSON.parse(event.data);
-            if (updated && updated.roomId === roomId) {
-              localRooms.set(roomId, updated);
-              localRooms.set(updated.code, updated);
-              notifyLocalListeners(roomId, updated);
-            }
-          } catch {}
-        };
-      } catch {}
-    }
-
-    return () => {
-      attivo = false;
-      if (timerIniziale) clearTimeout(timerIniziale);
-      controller?.abort();
-      const insieme = localListeners.get(roomId);
-      insieme?.delete(onUpdateProtetto);
-      if (insieme && insieme.size === 0) localListeners.delete(roomId);
-      if (eventSource) {
-        eventSource.close();
-      }
-    };
+    return sottoscriviStanzaFirestore(safeId, onUpdate, onError);
   }
+  return sottoscriviStanzaLocale(safeId, onUpdate);
 }
 
 /**
@@ -793,12 +860,7 @@ export async function finalizeDubitoResolution(
   currentRoom: RoomState
 ): Promise<void> {
   const { pendingMove, dubitoState } = currentRoom;
-  if (
-    !pendingMove ||
-    !dubitoState ||
-    dubitoState.status !== 'RESOLVED' ||
-    !dubitoState.resolution
-  ) {
+  if (!pendingMove || dubitoState?.status !== 'RESOLVED' || !dubitoState?.resolution) {
     return;
   }
 
@@ -1301,14 +1363,17 @@ export async function startNextManche(roomId: string, room: RoomState): Promise<
  * Internal helper to update Firestore doc or local memory
  */
 async function updateRoomData(roomId: string, data: Partial<RoomState>): Promise<void> {
+  const safeId = sanificaIdStanza(roomId);
+  if (!safeId) return;
+
   if (isFirebaseConfigured && db) {
-    const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+    const roomRef = doc(db, ROOMS_COLLECTION, safeId);
     await updateDoc(roomRef, data);
   } else {
-    let current = getLocalRoom(roomId);
+    let current = getLocalRoom(safeId);
     if (!current && typeof window !== 'undefined') {
       try {
-        const res = await fetch(`/__api/rooms/${roomId}`);
+        const res = await fetch(`/__api/rooms/${encodeURIComponent(safeId)}`);
         if (res.ok) current = await res.json();
       } catch {}
     }
@@ -1323,7 +1388,7 @@ async function updateRoomData(roomId: string, data: Partial<RoomState>): Promise
           }).catch(() => {});
         } catch {}
       }
-      saveLocalRoom(roomId, updated.code, updated);
+      saveLocalRoom(safeId, updated.code, updated);
     }
   }
 }

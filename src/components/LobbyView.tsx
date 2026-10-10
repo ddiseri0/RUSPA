@@ -22,6 +22,12 @@ interface LobbyViewProps {
   errorMessage?: string | null;
 }
 
+function calcolaEtichettaCreaStanza(isConnecting: boolean, isLoading: boolean): string {
+  if (isConnecting) return 'Connessione in corso...';
+  if (isLoading) return 'Creazione stanza...';
+  return 'Crea Stanza Ora';
+}
+
 export const LobbyView: React.FC<LobbyViewProps> = ({
   currentRoom,
   currentUser,
@@ -338,11 +344,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             disabled={isLoading || isConnecting || !playerName.trim()}
             className="w-full py-4 rounded-full bg-[#f2f2f2] text-[#000000] font-semibold text-sm hover:bg-[#e6e6e6] active:scale-98 transition-all shadow-lg disabled:opacity-40 cursor-pointer"
           >
-            {isConnecting
-              ? 'Connessione in corso...'
-              : isLoading
-                ? 'Creazione stanza...'
-                : 'Crea Stanza Ora'}
+            {calcolaEtichettaCreaStanza(isConnecting, isLoading)}
           </button>
         </div>
 

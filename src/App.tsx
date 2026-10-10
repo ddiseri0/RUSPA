@@ -80,9 +80,11 @@ export default function App() {
   // restano disabilitate finché l'identità non è disponibile (cache IndexedDB o login anonimo).
   useEffect(() => {
     let attivo = true;
-    getOrCreatePlayerUser().then(user => {
-      if (attivo) setCurrentUser(user);
-    });
+    void getOrCreatePlayerUser()
+      .then(user => {
+        if (attivo) setCurrentUser(user);
+      })
+      .catch(() => {});
     return () => {
       attivo = false;
     };
@@ -268,7 +270,7 @@ export default function App() {
           ...currentRoom,
           mancheDetail: {
             ...detail,
-            readyPlayers: { ...(detail.readyPlayers || {}), [currentUser.uid]: true },
+            readyPlayers: { ...detail.readyPlayers, [currentUser.uid]: true },
           },
         }
       : null;
@@ -527,11 +529,7 @@ export default function App() {
 
   return (
     <>
-      {currentUser &&
-      currentRoom &&
-      currentRoom.phase &&
-      currentRoom.phase !== 'LOBBY' &&
-      currentRoom.players ? (
+      {currentUser && currentRoom?.phase && currentRoom.phase !== 'LOBBY' && currentRoom.players ? (
         <Suspense fallback={schermataCaricamento}>
           <GameBoard
             room={currentRoom}

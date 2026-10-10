@@ -11,6 +11,12 @@ interface DubitoModalProps {
   onVote: (vote: 'DUBITO' | 'PASSA') => void;
 }
 
+function calcolaDimensioneCarta(conteggio: number): 'sm' | 'md' | 'lg' {
+  if (conteggio <= 2) return 'lg';
+  if (conteggio <= 3) return 'md';
+  return 'sm';
+}
+
 export const DubitoModal: React.FC<DubitoModalProps> = ({
   dubitoState,
   currentUserId,
@@ -144,12 +150,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
             ) : (
               targetedCards.map(c => (
                 <div key={c.id} className="relative transition-all duration-200 hover:scale-105">
-                  <CardView
-                    card={c}
-                    size={
-                      targetedCards.length <= 2 ? 'lg' : targetedCards.length <= 3 ? 'md' : 'sm'
-                    }
-                  />
+                  <CardView card={c} size={calcolaDimensioneCarta(targetedCards.length)} />
                 </div>
               ))
             )}

@@ -74,12 +74,10 @@ let richiestaUtenteInCorso: Promise<{ uid: string; isAnonymous: boolean }> | nul
 export function getOrCreatePlayerUser(
   savedId?: string
 ): Promise<{ uid: string; isAnonymous: boolean }> {
-  if (!richiestaUtenteInCorso) {
-    richiestaUtenteInCorso = risolviUtente(savedId).catch(err => {
-      richiestaUtenteInCorso = null;
-      throw err;
-    });
-  }
+  richiestaUtenteInCorso ??= risolviUtente(savedId).catch(err => {
+    richiestaUtenteInCorso = null;
+    throw err;
+  });
   return richiestaUtenteInCorso;
 }
 
@@ -100,7 +98,11 @@ async function risolviUtente(savedId?: string): Promise<{ uid: string; isAnonymo
   // Local fallback UID for offline/preview testing (sessionStorage allows multiple tabs in the same browser)
   let localUid = savedId || sessionStorage.getItem('ruspa_player_uid');
   if (!localUid) {
-    localUid = 'usr_' + Math.random().toString(36).substring(2, 9);
+    const suffisso =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().substring(0, 8)
+        : Date.now().toString(36);
+    localUid = `usr_${suffisso}`;
     sessionStorage.setItem('ruspa_player_uid', localUid);
   }
   return { uid: localUid, isAnonymous: true };

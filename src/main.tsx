@@ -6,14 +6,11 @@ import './index.css';
 
 // Registrazione del Service Worker per il caching locale degli asset su reti degradate
 if ('serviceWorker' in navigator && !import.meta.env.DEV) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then(reg => {
-        // Verifica aggiornamenti della cache
-        reg.update().catch(() => {});
-      })
-      .catch(() => {});
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await reg.update();
+    } catch {}
   });
 }
 
