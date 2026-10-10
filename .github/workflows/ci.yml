@@ -1,0 +1,30 @@
+name: CI Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: PR Quality Gate (Tests & Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies (clean install)
+        run: npm ci
+
+      - name: Run tests and type-checking
+        run: npm test
+
+      - name: Validate production build
+        run: npm run build

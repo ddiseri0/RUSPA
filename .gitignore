@@ -16,11 +16,24 @@ build/
 
 # Environment and local files
 .env
-.env*.local
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+*.local
+*.local.*
+
+# Security credentials, private keys, and tokens
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*token*
+*.token
+*.secret
+*secret*
+id_rsa*
+id_ed25519*
 
 # Vercel deployment artifacts
 .vercel/

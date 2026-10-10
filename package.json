@@ -2,6 +2,7 @@
   "name": "ruspa-poc",
   "private": true,
   "version": "1.0.3",
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "dev": "vite",
