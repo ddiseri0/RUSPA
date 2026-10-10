@@ -11,10 +11,12 @@ export type Phase = 'IDLE' | 'PLAYER_MOVE' | 'CHALLENGE_WINDOW' | 'RESOLUTION' |
 
 export interface Move {
   playerId: string;
-  playedCard: Card; 
-  targetCards: Card[]; 
+  playedCard: Card;
+  targetCards: Card[];
   isRuspa: boolean;
   timestamp: number;
+  /** Identificativo univoco della mossa: rende idempotenti i reinvii dopo una riconnessione. */
+  moveId?: string;
 }
 
 export interface PlayerState {
@@ -38,24 +40,35 @@ export interface GameState {
   roomId?: string;
   board: Card[];
   players: Record<string, PlayerState>;
-  turnOrder: string[]; 
+  turnOrder: string[];
   currentTurn: string;
   phase: Phase;
   pendingMove: Move | null;
   lastActionMessage: string;
   deck: Card[];
   lastCaptureBy: string | null;
+  /** Contatore monotono incrementato a ogni transizione di stato. */
+  version?: number;
+  lastMoveId?: string | null;
 }
 
 export interface ClientGameState {
   roomId: string;
   board: Card[];
   players: Record<string, ClientPlayerState>;
-  turnOrder: string[]; 
+  turnOrder: string[];
   currentTurn: string;
   phase: Phase;
   pendingMove: Move | null; // For opponents, playedCard might be a hidden placeholer like {id:'hidden', suit:'denari', value:0}
   lastActionMessage: string;
   deckCount: number;
   lastCaptureBy: string | null;
+  /** Consente al client di scartare stati obsoleti ricevuti fuori ordine dopo una riconnessione. */
+  version: number;
+}
+
+/** Esito restituito dal server tramite acknowledgement per le azioni di gioco. */
+export interface EsitoAzione {
+  ok: boolean;
+  error?: string;
 }

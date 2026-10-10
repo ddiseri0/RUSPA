@@ -11,6 +11,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../lib/firebase';
+import { registraAvviso, registraErrore } from '../lib/registro';
 import { RoomState, Player, Move, GameMode, Card, DubitoState, MancheDetail } from '../types/game';
 import {
   preparaDistribuzioneIniziale,
@@ -32,7 +33,7 @@ const syncChannel =
     : null;
 
 if (syncChannel) {
-  syncChannel.onmessage = (event) => {
+  syncChannel.onmessage = event => {
     if (event.data?.type === 'SYNC_ROOM' && event.data.room) {
       const room = event.data.room as RoomState;
       localRooms.set(room.roomId, room);
@@ -42,58 +43,64 @@ if (syncChannel) {
   };
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key && e.key.startsWith('ruspa_room_') && e.newValue) {
-      try {
-        const room = JSON.parse(e.newValue) as RoomState;
-        localRooms.set(room.roomId, room);
-        localRooms.set(room.code, room);
-        notifyLocalListeners(room.roomId, room);
-      } catch {}
-    }
-  });
-}
-
 function notifyLocalListeners(roomId: string, room: RoomState) {
   const listeners = localListeners.get(roomId);
   if (listeners) {
-    listeners.forEach((cb) => cb({ ...room }));
+    listeners.forEach(cb => cb({ ...room }));
   }
+}
+
+function sanificaIdStanza(input: string): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 64);
+}
+
+function calcolaSquadra(modo: GameMode, posto: number): 1 | 2 {
+  if (modo === '2v2') {
+    return posto % 2 === 0 ? 1 : 2;
+  }
+  return posto === 0 ? 1 : 2;
+}
+
+function ottieniNumeroCasualeSicuro(massimoEscluso: number): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0] % massimoEscluso;
+  }
+  return Date.now() % massimoEscluso;
+}
+
+function ottieniFloatCasuale(): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0] / (0xffffffff + 1);
+  }
+  return (Date.now() % 1000) / 1000;
 }
 
 function saveLocalRoom(roomId: string, code: string, room: RoomState) {
-  localRooms.set(roomId, room);
-  localRooms.set(code, room);
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      localStorage.setItem(`ruspa_room_${roomId}`, JSON.stringify(room));
-      localStorage.setItem(`ruspa_code_${code}`, roomId);
-    } catch {}
-  }
-  syncChannel?.postMessage({ type: 'SYNC_ROOM', roomId, room });
-  notifyLocalListeners(roomId, room);
+  const safeRoomId = sanificaIdStanza(roomId);
+  const safeCode = sanificaIdStanza(code);
+  if (!safeRoomId) return;
+
+  localRooms.set(safeRoomId, room);
+  if (safeCode) localRooms.set(safeCode, room);
+  syncChannel?.postMessage({ type: 'SYNC_ROOM', roomId: safeRoomId, room });
+  notifyLocalListeners(safeRoomId, room);
 }
 
 function getLocalRoom(codeOrId: string): RoomState | null {
-  const clean = codeOrId.trim().toUpperCase();
+  const safeInput = sanificaIdStanza(codeOrId);
+  if (!safeInput) return null;
+  const clean = safeInput.toUpperCase();
   if (localRooms.has(clean)) return localRooms.get(clean)!;
-  if (localRooms.has('room_' + clean.toLowerCase())) return localRooms.get('room_' + clean.toLowerCase())!;
-
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const mappedId = localStorage.getItem(`ruspa_code_${clean}`);
-      const raw =
-        localStorage.getItem(`ruspa_room_${mappedId || clean}`) ||
-        localStorage.getItem(`ruspa_room_room_${clean.toLowerCase()}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as RoomState;
-        localRooms.set(parsed.roomId, parsed);
-        localRooms.set(parsed.code, parsed);
-        return parsed;
-      }
-    } catch {}
-  }
+  if (localRooms.has('room_' + clean.toLowerCase()))
+    return localRooms.get('room_' + clean.toLowerCase())!;
   return null;
 }
 
@@ -104,7 +111,7 @@ export function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(ottieniNumeroCasualeSicuro(chars.length));
   }
   return result;
 }
@@ -170,7 +177,9 @@ export async function createRoom(host: Player, mode: GameMode): Promise<RoomStat
  * Joins an existing room by code or ID
  */
 export async function joinRoom(roomCodeOrId: string, player: Player): Promise<RoomState | null> {
-  const cleanKey = roomCodeOrId.trim().toUpperCase();
+  const safeKey = sanificaIdStanza(roomCodeOrId);
+  if (!safeKey) return null;
+  const cleanKey = safeKey.toUpperCase();
 
   if (isFirebaseConfigured && db) {
     // Search by code or by direct document ID
@@ -198,7 +207,7 @@ export async function joinRoom(roomCodeOrId: string, player: Player): Promise<Ro
 
     // Determine team and seat
     const seat = currentCount;
-    const team: 1 | 2 = room.mode === '2v2' ? (seat % 2 === 0 ? 1 : 2) : (seat === 0 ? 1 : 2);
+    const team: 1 | 2 = calcolaSquadra(room.mode, seat);
 
     const updatedPlayers = {
       ...room.players,
@@ -234,19 +243,19 @@ export async function joinRoom(roomCodeOrId: string, player: Player): Promise<Ro
     if (!room && typeof window !== 'undefined') {
       // Fetch from dev server hub (allows Incognito window to find room created in normal window)
       try {
-        const res = await fetch(`/__api/rooms/${cleanKey}`);
+        const res = await fetch(`/__api/rooms/${encodeURIComponent(cleanKey)}`);
         if (res.ok) {
           room = await res.json();
         }
       } catch (err) {
-        console.warn('[joinRoom] Dev server lookup error:', err);
+        registraAvviso('[joinRoom] Dev server lookup error:', err);
       }
     }
     if (!room) return null;
 
     const currentCount = Object.keys(room.players).length;
     const seat = currentCount;
-    const team: 1 | 2 = room.mode === '2v2' ? (seat % 2 === 0 ? 1 : 2) : 2;
+    const team: 1 | 2 = calcolaSquadra(room.mode, seat);
 
     room.players[player.id] = {
       ...player,
@@ -296,8 +305,8 @@ export async function leaveRoom(
   // If game is in progress, forfeit immediately!
   if (currentRoom.phase !== 'LOBBY' && currentRoom.phase !== 'GAME_OVER') {
     const winningTeam: 1 | 2 = leavingPlayer?.team === 1 ? 2 : 1;
-    const winners = Object.values(currentRoom.players).filter((p) => p.team === winningTeam);
-    const winnerNames = winners.map((w) => w.name);
+    const winners = Object.values(currentRoom.players).filter(p => p.team === winningTeam);
+    const winnerNames = winners.map(w => w.name);
     const winnerScore = winners.reduce((acc, w) => acc + (w.score || 0), 0);
     const leavingName = leavingPlayer?.name || 'Un giocatore';
 
@@ -323,7 +332,7 @@ export async function leaveRoom(
     const updatedPlayers = { ...currentRoom.players };
     delete updatedPlayers[leavingPlayerId];
 
-    const updatedTurnOrder = currentRoom.turnOrder.filter((id) => id !== leavingPlayerId);
+    const updatedTurnOrder = currentRoom.turnOrder.filter(id => id !== leavingPlayerId);
     let nextHostId = currentRoom.hostId;
 
     if (currentRoom.hostId === leavingPlayerId && updatedTurnOrder.length > 0) {
@@ -345,75 +354,148 @@ export async function leaveRoom(
   }
 }
 
+const RITARDO_BASE_RISOTTOSCRIZIONE_MS = 1000;
+const RITARDO_MASSIMO_RISOTTOSCRIZIONE_MS = 30000;
+
 /**
  * Subscribes to realtime updates of a room
+ *
+ * Ciclo di vita del listener:
+ * - Un errore di `onSnapshot` è terminale (il listener viene chiuso dall'SDK, es. token Auth
+ *   scaduto durante un cambio di rete): si riattiva con backoff esponenziale e jitter.
+ * - Dopo la disiscrizione nessuna callback può più raggiungere la UI (flag `attivo`),
+ *   evitando setState su componenti smontati e listener fantasma.
+ */
+function sottoscriviStanzaFirestore(
+  roomId: string,
+  onUpdate: (room: RoomState) => void,
+  onError?: (err: Error) => void
+): Unsubscribe {
+  let attivo = true;
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
+  let annullaSnapshot: Unsubscribe | null = null;
+  let timerRiprova: ReturnType<typeof setTimeout> | null = null;
+  let tentativi = 0;
+
+  const sottoscrivi = () => {
+    if (!attivo) return;
+    annullaSnapshot = onSnapshot(
+      roomRef,
+      snapshot => {
+        if (!attivo) return;
+        tentativi = 0;
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data() as RoomState);
+        }
+      },
+      error => {
+        if (!attivo) return;
+        registraErrore('Firestore listener error:', error);
+        annullaSnapshot = null;
+        if (error.code === 'permission-denied' && tentativi >= 3) {
+          onError?.(error);
+          return;
+        }
+        const ritardo = Math.min(
+          RITARDO_MASSIMO_RISOTTOSCRIZIONE_MS,
+          RITARDO_BASE_RISOTTOSCRIZIONE_MS * 2 ** tentativi
+        );
+        tentativi++;
+        timerRiprova = setTimeout(sottoscrivi, ritardo * (0.75 + ottieniFloatCasuale() * 0.5));
+      }
+    );
+  };
+
+  sottoscrivi();
+
+  return () => {
+    attivo = false;
+    if (timerRiprova) clearTimeout(timerRiprova);
+    annullaSnapshot?.();
+    annullaSnapshot = null;
+  };
+}
+
+function sottoscriviStanzaLocale(roomId: string, onUpdate: (room: RoomState) => void): Unsubscribe {
+  let attivo = true;
+  const onUpdateProtetto = (r: RoomState) => {
+    if (attivo) onUpdate(r);
+  };
+  if (!localListeners.has(roomId)) {
+    localListeners.set(roomId, new Set());
+  }
+  localListeners.get(roomId)!.add(onUpdateProtetto);
+
+  const room = getLocalRoom(roomId);
+  let timerIniziale: ReturnType<typeof setTimeout> | null = null;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  if (room) {
+    timerIniziale = setTimeout(() => onUpdateProtetto({ ...room }), 0);
+  } else if (typeof window !== 'undefined') {
+    fetch(`/__api/rooms/${encodeURIComponent(roomId)}`, { signal: controller?.signal })
+      .then(r => r.json())
+      .then(r => {
+        if (attivo && r?.roomId) {
+          saveLocalRoom(r.roomId, r.code, r);
+        }
+      })
+      .catch(() => {});
+  }
+
+  // Connect Server-Sent Events stream from dev server for real-time cross-window sync
+  let eventSource: EventSource | null = null;
+  if (typeof window !== 'undefined' && 'EventSource' in window) {
+    try {
+      eventSource = new EventSource(`/__api/rooms/${encodeURIComponent(roomId)}/events`);
+      eventSource.onmessage = event => {
+        try {
+          const updated = JSON.parse(event.data);
+          if (updated && updated.roomId === roomId) {
+            localRooms.set(roomId, updated);
+            localRooms.set(updated.code, updated);
+            notifyLocalListeners(roomId, updated);
+          }
+        } catch {}
+      };
+    } catch {}
+  }
+
+  return () => {
+    attivo = false;
+    if (timerIniziale) clearTimeout(timerIniziale);
+    controller?.abort();
+    const insieme = localListeners.get(roomId);
+    insieme?.delete(onUpdateProtetto);
+    if (insieme?.size === 0) localListeners.delete(roomId);
+    if (eventSource) {
+      eventSource.close();
+    }
+  };
+}
+
+/**
+ * Subscribes to realtime updates of a room
+ *
+ * Ciclo di vita del listener:
+ * - Un errore di `onSnapshot` è terminale (il listener viene chiuso dall'SDK, es. token Auth
+ *   scaduto durante un cambio di rete): si riattiva con backoff esponenziale e jitter.
+ * - Dopo la disiscrizione nessuna callback può più raggiungere la UI (flag `attivo`),
+ *   evitando setState su componenti smontati e listener fantasma.
  */
 export function subscribeToRoom(
   roomId: string,
   onUpdate: (room: RoomState) => void,
   onError?: (err: Error) => void
 ): Unsubscribe {
-  if (isFirebaseConfigured && db) {
-    const roomRef = doc(db, ROOMS_COLLECTION, roomId);
-    return onSnapshot(
-      roomRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          onUpdate(snapshot.data() as RoomState);
-        }
-      },
-      (error) => {
-        console.error('Firestore listener error:', error);
-        onError?.(error);
-      }
-    );
-  } else {
-    // Local subscriber
-    if (!localListeners.has(roomId)) {
-      localListeners.set(roomId, new Set());
-    }
-    localListeners.get(roomId)!.add(onUpdate);
-
-    const room = getLocalRoom(roomId);
-    if (room) {
-      setTimeout(() => onUpdate({ ...room }), 0);
-    } else if (typeof window !== 'undefined') {
-      fetch(`/__api/rooms/${roomId}`)
-        .then((r) => r.json())
-        .then((r) => {
-          if (r && r.roomId) {
-            saveLocalRoom(r.roomId, r.code, r);
-            onUpdate(r);
-          }
-        })
-        .catch(() => {});
-    }
-
-    // Connect Server-Sent Events stream from dev server for real-time cross-window sync
-    let eventSource: EventSource | null = null;
-    if (typeof window !== 'undefined' && 'EventSource' in window) {
-      try {
-        eventSource = new EventSource(`/__api/rooms/${roomId}/events`);
-        eventSource.onmessage = (event) => {
-          try {
-            const updated = JSON.parse(event.data);
-            if (updated && updated.roomId === roomId) {
-              localRooms.set(roomId, updated);
-              localRooms.set(updated.code, updated);
-              notifyLocalListeners(roomId, updated);
-            }
-          } catch {}
-        };
-      } catch {}
-    }
-
-    return () => {
-      localListeners.get(roomId)?.delete(onUpdate);
-      if (eventSource) {
-        eventSource.close();
-      }
-    };
+  const safeId = sanificaIdStanza(roomId);
+  if (!safeId) {
+    return () => {};
   }
+
+  if (isFirebaseConfigured && db) {
+    return sottoscriviStanzaFirestore(safeId, onUpdate, onError);
+  }
+  return sottoscriviStanzaLocale(safeId, onUpdate);
 }
 
 /**
@@ -428,12 +510,12 @@ export async function startMatch(roomId: string, currentRoom: RoomState): Promis
 
   // Distribute 3 cards to each player
   const privateHands: Record<string, Card[]> = {};
-  playerIds.forEach((pid) => {
+  playerIds.forEach(pid => {
     privateHands[pid] = fullDeck.splice(0, 3);
   });
 
   const updatedPlayers = { ...currentRoom.players };
-  playerIds.forEach((pid) => {
+  playerIds.forEach(pid => {
     updatedPlayers[pid] = {
       ...updatedPlayers[pid],
       handCount: 3,
@@ -444,7 +526,7 @@ export async function startMatch(roomId: string, currentRoom: RoomState): Promis
   });
 
   const capturedPiles: Record<string, Card[]> = {};
-  playerIds.forEach((pid) => {
+  playerIds.forEach(pid => {
     capturedPiles[pid] = [];
   });
 
@@ -488,7 +570,7 @@ export async function submitCoveredMove(
   // Remove played card from private hand
   const currentHand = currentRoom.privateHands?.[move.playerId] || [];
   const cardIndex = currentHand.findIndex(
-    (c) =>
+    c =>
       c.id === move.playedCard.id ||
       ((c.valore ?? c.value) === (move.playedCard.valore ?? move.playedCard.value) &&
         (c.seme ?? c.suit) === (move.playedCard.seme ?? move.playedCard.suit))
@@ -496,7 +578,7 @@ export async function submitCoveredMove(
   const updatedHand =
     cardIndex >= 0
       ? [...currentHand.slice(0, cardIndex), ...currentHand.slice(cardIndex + 1)]
-      : currentHand.filter((c) => c.id !== move.playedCard.id);
+      : currentHand.filter(c => c.id !== move.playedCard.id);
 
   const updatedPlayers = {
     ...currentRoom.players,
@@ -595,9 +677,9 @@ export async function submitDubitoVote(
 
   // Check if all opposing team members have passed
   const opposingPlayers = Object.values(currentRoom.players).filter(
-    (p) => p.team === currentRoom.dubitoState!.targetTeam
+    p => p.team === currentRoom.dubitoState!.targetTeam
   );
-  const allPassed = opposingPlayers.every((p) => updatedVotes[p.id] === 'PASSA');
+  const allPassed = opposingPlayers.every(p => updatedVotes[p.id] === 'PASSA');
 
   if (allPassed) {
     await resolvePassMove(roomId, currentRoom);
@@ -633,9 +715,7 @@ export async function resolveDubitoChallenge(
   if (pendingMove.isRuspa) {
     targetCards = [...currentRoom.board];
   } else {
-    targetCards = currentRoom.board.filter((c) =>
-      pendingMove.targetCardIds.includes(c.id)
-    );
+    targetCards = currentRoom.board.filter(c => pendingMove.targetCardIds.includes(c.id));
   }
 
   const verification = verifyCaptureLegitimacy(
@@ -695,7 +775,8 @@ export async function resolveDubitoChallenge(
       ...updatedPlayers[pendingMove.playerId],
       score: updatedPlayers[pendingMove.playerId].score + pointsAwarded,
       scopaCount: updatedPlayers[pendingMove.playerId].scopaCount + pointsAwarded,
-      capturedCount: (updatedPlayers[pendingMove.playerId].capturedCount || 0) + allCapturedCards.length,
+      capturedCount:
+        (updatedPlayers[pendingMove.playerId].capturedCount || 0) + allCapturedCards.length,
     };
     updatedCapturedPiles[pendingMove.playerId] = [
       ...(updatedCapturedPiles[pendingMove.playerId] || []),
@@ -704,7 +785,7 @@ export async function resolveDubitoChallenge(
     if (pendingMove.isRuspa) {
       newBoard = [];
     } else {
-      newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
+      newBoard = newBoard.filter(c => !pendingMove.targetCardIds.includes(c.id));
     }
   }
 
@@ -743,7 +824,7 @@ export async function finalizeDubitoResolution(
   currentRoom: RoomState
 ): Promise<void> {
   const { pendingMove, dubitoState } = currentRoom;
-  if (!pendingMove || !dubitoState || dubitoState.status !== 'RESOLVED' || !dubitoState.resolution) {
+  if (!pendingMove || dubitoState?.status !== 'RESOLVED' || !dubitoState?.resolution) {
     return;
   }
 
@@ -752,9 +833,7 @@ export async function finalizeDubitoResolution(
   if (pendingMove.isRuspa) {
     targetCards = [...currentRoom.board];
   } else {
-    targetCards = currentRoom.board.filter((c) =>
-      pendingMove.targetCardIds.includes(c.id)
-    );
+    targetCards = currentRoom.board.filter(c => pendingMove.targetCardIds.includes(c.id));
   }
 
   let newBoard = [...currentRoom.board];
@@ -793,7 +872,7 @@ export async function finalizeDubitoResolution(
     if (pendingMove.isRuspa) {
       newBoard = [];
     } else {
-      newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
+      newBoard = newBoard.filter(c => !pendingMove.targetCardIds.includes(c.id));
     }
   }
 
@@ -844,10 +923,7 @@ export async function resolvePassMove(roomId: string, currentRoom: RoomState): P
     // Swept the entire board!
     captureOccurred = true;
     const allCapturedCards = [pendingMove.playedCard, ...newBoard];
-    updatedCapturedPiles[moverId] = [
-      ...(updatedCapturedPiles[moverId] || []),
-      ...allCapturedCards,
-    ];
+    updatedCapturedPiles[moverId] = [...(updatedCapturedPiles[moverId] || []), ...allCapturedCards];
     // REGOLE LA RUSPA: L'Asso Ruspa prende tutto il tavolo ma NON assegna MAI punto di Scopa!
     updatedPlayers[moverId] = {
       ...player,
@@ -857,19 +933,16 @@ export async function resolvePassMove(roomId: string, currentRoom: RoomState): P
     actionMessage = `✨ RUSPA COMPLETATA! ${player.name} pulisce l'intero tavolo (nessun punto Scopa per la Ruspa).`;
   } else if (pendingMove.targetCardIds.length > 0) {
     captureOccurred = true;
-    const targetCards = newBoard.filter((c) => pendingMove.targetCardIds.includes(c.id));
+    const targetCards = newBoard.filter(c => pendingMove.targetCardIds.includes(c.id));
     const allCapturedCards = [pendingMove.playedCard, ...targetCards];
-    newBoard = newBoard.filter((c) => !pendingMove.targetCardIds.includes(c.id));
+    newBoard = newBoard.filter(c => !pendingMove.targetCardIds.includes(c.id));
 
-    updatedCapturedPiles[moverId] = [
-      ...(updatedCapturedPiles[moverId] || []),
-      ...allCapturedCards,
-    ];
+    updatedCapturedPiles[moverId] = [...(updatedCapturedPiles[moverId] || []), ...allCapturedCards];
 
     // Verifica se è l'ultima mano/giocata del mazzo da 40 carte (non è scopa)
     const isLastPlayOfDeck =
       (currentRoom.deckRemaining === 0 || !currentRoom.deck || currentRoom.deck.length === 0) &&
-      Object.values(updatedPlayers).every((p) => p.handCount === 0);
+      Object.values(updatedPlayers).every(p => p.handCount === 0);
 
     if (newBoard.length === 0) {
       if (!isLastPlayOfDeck) {
@@ -935,20 +1008,18 @@ export async function advanceGameAfterMove(
   moverOrTakerId: string,
   captureOccurred: boolean
 ): Promise<void> {
-  const lastCapturePlayerId = captureOccurred ? moverOrTakerId : (room.lastCapturePlayerId || null);
+  const lastCapturePlayerId = captureOccurred ? moverOrTakerId : room.lastCapturePlayerId || null;
 
   // Check if all players have 0 cards in hand
-  const allHandsEmpty = Object.values(updatedPlayers).every((p) => p.handCount === 0);
+  const allHandsEmpty = Object.values(updatedPlayers).every(p => p.handCount === 0);
 
   if (!allHandsEmpty) {
     // Normal turn advance
-    const turnOrder = (room.turnOrder && room.turnOrder.length > 0)
-      ? room.turnOrder
-      : Object.keys(updatedPlayers);
+    const turnOrder =
+      room.turnOrder && room.turnOrder.length > 0 ? room.turnOrder : Object.keys(updatedPlayers);
     const currentIndex = turnOrder.indexOf(room.currentTurnPlayerId);
-    const nextPlayerId = currentIndex >= 0
-      ? turnOrder[(currentIndex + 1) % turnOrder.length]
-      : turnOrder[0];
+    const nextPlayerId =
+      currentIndex >= 0 ? turnOrder[(currentIndex + 1) % turnOrder.length] : turnOrder[0];
 
     await updateRoomData(roomId, {
       phase: 'PLAYER_TURN',
@@ -976,11 +1047,10 @@ export async function advanceGameAfterMove(
     const freshHands: Record<string, Card[]> = { ...(room.privateHands || {}) };
     const playersWithNewHands = { ...updatedPlayers };
 
-    const turnOrder = (room.turnOrder && room.turnOrder.length > 0)
-      ? room.turnOrder
-      : Object.keys(updatedPlayers);
+    const turnOrder =
+      room.turnOrder && room.turnOrder.length > 0 ? room.turnOrder : Object.keys(updatedPlayers);
 
-    turnOrder.forEach((pid) => {
+    turnOrder.forEach(pid => {
       const dealt = currentDeck.splice(0, 3);
       freshHands[pid] = dealt;
       playersWithNewHands[pid] = {
@@ -990,9 +1060,8 @@ export async function advanceGameAfterMove(
     });
 
     const currentIndex = turnOrder.indexOf(room.currentTurnPlayerId);
-    const nextPlayerId = currentIndex >= 0
-      ? turnOrder[(currentIndex + 1) % turnOrder.length]
-      : turnOrder[0];
+    const nextPlayerId =
+      currentIndex >= 0 ? turnOrder[(currentIndex + 1) % turnOrder.length] : turnOrder[0];
 
     await updateRoomData(roomId, {
       phase: 'PLAYER_TURN',
@@ -1035,17 +1104,17 @@ export async function advanceGameAfterMove(
   // Tally manche classic points
   const team1Cards: Card[] = [];
   const team2Cards: Card[] = [];
-  Object.values(finalPlayers).forEach((p) => {
+  Object.values(finalPlayers).forEach(p => {
     const pile = finalCapturedPiles[p.id] || [];
     if (p.team === 1) team1Cards.push(...pile);
     else team2Cards.push(...pile);
   });
 
   const team1Scope = Object.values(finalPlayers)
-    .filter((p) => p.team === 1)
+    .filter(p => p.team === 1)
     .reduce((acc, p) => acc + (p.scopaCount || 0), 0);
   const team2Scope = Object.values(finalPlayers)
-    .filter((p) => p.team === 2)
+    .filter(p => p.team === 2)
     .reduce((acc, p) => acc + (p.scopaCount || 0), 0);
 
   const mancheResult = evaluateManchePoints(team1Cards, team2Cards, team1Scope, team2Scope);
@@ -1063,8 +1132,8 @@ export async function advanceGameAfterMove(
     mancheResult.p2Points.primiera;
 
   // Add classic points to players (first player of each team)
-  const team1Players = Object.values(finalPlayers).filter((p) => p.team === 1);
-  const team2Players = Object.values(finalPlayers).filter((p) => p.team === 2);
+  const team1Players = Object.values(finalPlayers).filter(p => p.team === 1);
+  const team2Players = Object.values(finalPlayers).filter(p => p.team === 2);
 
   if (team1Players[0]) {
     team1Players[0].score += team1Classic;
@@ -1082,8 +1151,8 @@ export async function advanceGameAfterMove(
   // Check victory condition: >= 21 points
   const isGameOver = (totalScore1 >= 21 || totalScore2 >= 21) && totalScore1 !== totalScore2;
 
-  const team1Name = team1Players.map((p) => p.name).join(' & ') || 'Squadra 1';
-  const team2Name = team2Players.map((p) => p.name).join(' & ') || 'Squadra 2';
+  const team1Name = team1Players.map(p => p.name).join(' & ') || 'Squadra 1';
+  const team2Name = team2Players.map(p => p.name).join(' & ') || 'Squadra 2';
 
   const mancheDetail: MancheDetail = {
     mancheNumber: currentManche,
@@ -1159,8 +1228,8 @@ export async function continueFromMancheSummary(
   };
 
   // Only count human players for multiplayer synchronization
-  const humanPlayers = Object.keys(currentRoom.players).filter((pid) => !pid.startsWith('bot_'));
-  const readyCount = humanPlayers.filter((pid) => updatedReady[pid]).length;
+  const humanPlayers = Object.keys(currentRoom.players).filter(pid => !pid.startsWith('bot_'));
+  const readyCount = humanPlayers.filter(pid => updatedReady[pid]).length;
   const shouldProceed = readyCount >= humanPlayers.length || (isHost && alreadyReady);
 
   if (!shouldProceed) {
@@ -1179,10 +1248,10 @@ export async function continueFromMancheSummary(
     const totalScore1 = detail.squadra1.totaleProgressivo;
     const totalScore2 = detail.squadra2.totaleProgressivo;
     const winningTeam: 1 | 2 = totalScore1 > totalScore2 ? 1 : 2;
-    const winners = Object.values(currentRoom.players).filter((p) => p.team === winningTeam);
+    const winners = Object.values(currentRoom.players).filter(p => p.team === winningTeam);
     const winnerData = {
       team: winningTeam,
-      winnerNames: winners.map((w) => w.name),
+      winnerNames: winners.map(w => w.name),
       score: winningTeam === 1 ? totalScore1 : totalScore2,
     };
 
@@ -1217,7 +1286,7 @@ export async function startNextManche(roomId: string, room: RoomState): Promise<
   const resetCapturedPiles: Record<string, Card[]> = {};
   const updatedPlayers: Record<string, Player> = { ...room.players };
 
-  turnOrder.forEach((pid) => {
+  turnOrder.forEach(pid => {
     freshPrivateHands[pid] = freshDeck.splice(0, 3);
     if (updatedPlayers[pid]) {
       updatedPlayers[pid] = {
@@ -1258,14 +1327,17 @@ export async function startNextManche(roomId: string, room: RoomState): Promise<
  * Internal helper to update Firestore doc or local memory
  */
 async function updateRoomData(roomId: string, data: Partial<RoomState>): Promise<void> {
+  const safeId = sanificaIdStanza(roomId);
+  if (!safeId) return;
+
   if (isFirebaseConfigured && db) {
-    const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+    const roomRef = doc(db, ROOMS_COLLECTION, safeId);
     await updateDoc(roomRef, data);
   } else {
-    let current = getLocalRoom(roomId);
+    let current = getLocalRoom(safeId);
     if (!current && typeof window !== 'undefined') {
       try {
-        const res = await fetch(`/__api/rooms/${roomId}`);
+        const res = await fetch(`/__api/rooms/${encodeURIComponent(safeId)}`);
         if (res.ok) current = await res.json();
       } catch {}
     }
@@ -1280,7 +1352,7 @@ async function updateRoomData(roomId: string, data: Partial<RoomState>): Promise
           }).catch(() => {});
         } catch {}
       }
-      saveLocalRoom(roomId, updated.code, updated);
+      saveLocalRoom(safeId, updated.code, updated);
     }
   }
 }

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { RoomState, Move, GameMode, Player } from './types/game';
 import { getOrCreatePlayerUser } from './lib/firebase';
+import { registraAvviso } from './lib/registro';
 import {
   createRoom,
   joinRoom,
@@ -12,8 +13,14 @@ import {
   continueFromMancheSummary,
 } from './services/firestoreSync';
 import { LobbyView } from './components/LobbyView';
-import { GameBoard } from './components/GameBoard';
 import { registerWebMcpBridge } from './lib/webMcpBridge';
+
+// Il tavolo (con modali e animazioni) è un chunk separato: la lobby si avvia senza scaricarlo.
+const caricaGameBoard = () => import('./components/GameBoard');
+const GameBoard = lazy(() => caricaGameBoard().then(m => ({ default: m.GameBoard })));
+
+// Identità segnaposto mostrata durante l'idratazione Auth (le azioni restano disabilitate).
+const UTENTE_IN_ATTESA = { uid: '' };
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<{ uid: string } | null>(null);
@@ -33,11 +40,54 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Initialize Anonymous Firebase Auth / User
+  // Ultimo stato ricevuto dalla sorgente autorevole (snapshot Firestore o risposta del servizio):
+  // è il punto di ripristino in caso di rifiuto di un aggiornamento ottimistico.
+  const stanzaConfermataRef = useRef<RoomState | null>(null);
+  // Blocchi per azione: impediscono invii duplicati (doppio tap) mentre la rete è lenta.
+  const azioniInCorsoRef = useRef<Set<string>>(new Set());
+
+  const impostaStanzaConfermata = useCallback((room: RoomState | null) => {
+    stanzaConfermataRef.current = room;
+    azioniInCorsoRef.current.clear();
+    setCurrentRoom(room);
+  }, []);
+
+  /**
+   * Optimistic UI: applica subito lo stato previsto, invia l'azione in background e,
+   * in caso di rifiuto, ripristina l'ultimo stato confermato (non quello precedente all'azione,
+   * per non sovrascrivere snapshot più recenti arrivati nel frattempo).
+   */
+  const eseguiAzioneOttimistica = async (
+    chiave: string,
+    statoOttimistico: RoomState | null,
+    azione: () => Promise<void>,
+    messaggioErrore: string
+  ): Promise<void> => {
+    if (azioniInCorsoRef.current.has(chiave)) return;
+    azioniInCorsoRef.current.add(chiave);
+    if (statoOttimistico) setCurrentRoom(statoOttimistico);
+    try {
+      await azione();
+    } catch (err) {
+      if (stanzaConfermataRef.current) setCurrentRoom(stanzaConfermataRef.current);
+      setErrorMessage(err instanceof Error && err.message ? err.message : messaggioErrore);
+    } finally {
+      azioniInCorsoRef.current.delete(chiave);
+    }
+  };
+
+  // Idratazione Auth non bloccante: la UI viene renderizzata subito, le azioni di rete
+  // restano disabilitate finché l'identità non è disponibile (cache IndexedDB o login anonimo).
   useEffect(() => {
-    getOrCreatePlayerUser().then((user) => {
-      setCurrentUser(user);
-    });
+    let attivo = true;
+    void getOrCreatePlayerUser()
+      .then(user => {
+        if (attivo) setCurrentUser(user);
+      })
+      .catch(() => {});
+    return () => {
+      attivo = false;
+    };
   }, []);
 
   // Save player name to session storage
@@ -58,16 +108,16 @@ export default function App() {
 
     const unsubscribe = subscribeToRoom(
       currentRoom.roomId,
-      (updatedRoom) => {
-        setCurrentRoom(updatedRoom);
+      updatedRoom => {
+        impostaStanzaConfermata(updatedRoom);
       },
-      (err) => {
+      err => {
         setErrorMessage(`Errore sincronizzazione: ${err.message}`);
       }
     );
 
     return () => unsubscribe();
-  }, [currentRoom?.roomId]);
+  }, [currentRoom?.roomId, impostaStanzaConfermata]);
 
   // Create room
   const handleCreateRoom = async (mode: GameMode) => {
@@ -91,11 +141,12 @@ export default function App() {
       };
 
       const newRoom = await createRoom(hostPlayer, mode);
-      setCurrentRoom(newRoom);
+      impostaStanzaConfermata(newRoom);
       setIsLoading(false);
       return newRoom;
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Errore nella creazione della stanza');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore nella creazione della stanza';
+      setErrorMessage(msg);
       setIsLoading(false);
       return null;
     }
@@ -127,10 +178,11 @@ export default function App() {
         setIsLoading(false);
         return;
       }
-      setCurrentRoom(joinedRoom);
+      impostaStanzaConfermata(joinedRoom);
       setIsLoading(false);
-    } catch (err: any) {
-      setErrorMessage(err.message || "Errore durante l'accesso alla stanza");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Errore durante l'accesso alla stanza";
+      setErrorMessage(msg);
       setIsLoading(false);
     }
   };
@@ -142,8 +194,9 @@ export default function App() {
     try {
       await startMatch(currentRoom.roomId, currentRoom);
       setIsLoading(false);
-    } catch (err: any) {
-      setErrorMessage(err.message || "Errore durante l'avvio della partita");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Errore durante l'avvio della partita";
+      setErrorMessage(msg);
       setIsLoading(false);
     }
   };
@@ -151,47 +204,83 @@ export default function App() {
   // Play card move with optimistic local hand update
   const handlePlayMove = async (move: Move) => {
     if (!currentRoom) return;
-    try {
-      // Aggiornamento ottimistico immediato: la carta scompare all'istante dalla mano
-      const currentHand = currentRoom.privateHands?.[move.playerId] || [];
-      const updatedHand = currentHand.filter((c) => c.id !== move.playedCard.id);
-      const optimisticBoard = move.isDiscardFaceUp
-        ? [...currentRoom.board, move.playedCard]
-        : currentRoom.board;
+    // Aggiornamento ottimistico immediato: la carta scompare all'istante dalla mano
+    // e, se scartata scoperta, compare subito sul tavolo.
+    const currentHand = currentRoom.privateHands?.[move.playerId] || [];
+    const updatedHand = currentHand.filter(c => c.id !== move.playedCard.id);
+    const optimisticBoard = move.isDiscardFaceUp
+      ? [...currentRoom.board, move.playedCard]
+      : currentRoom.board;
+    const giocatore = currentRoom.players[move.playerId];
 
-      setCurrentRoom({
-        ...currentRoom,
-        board: optimisticBoard,
-        privateHands: {
-          ...(currentRoom.privateHands || {}),
-          [move.playerId]: updatedHand,
-        },
-      });
+    const statoOttimistico: RoomState = {
+      ...currentRoom,
+      board: optimisticBoard,
+      players: giocatore
+        ? {
+            ...currentRoom.players,
+            [move.playerId]: { ...giocatore, handCount: updatedHand.length },
+          }
+        : currentRoom.players,
+      privateHands: {
+        ...(currentRoom.privateHands || {}),
+        [move.playerId]: updatedHand,
+      },
+    };
 
-      await submitCoveredMove(currentRoom.roomId, currentRoom, move);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Errore nella giocata della carta');
-    }
+    // Blocco per giocatore: una sola mossa in volo finché non arriva lo snapshot di conferma.
+    await eseguiAzioneOttimistica(
+      `mossa:${move.playerId}`,
+      statoOttimistico,
+      () => submitCoveredMove(currentRoom.roomId, currentRoom, move),
+      'Errore nella giocata della carta'
+    );
   };
 
   // Dubito / Pass vote
   const handleDubitoVote = async (vote: 'DUBITO' | 'PASSA') => {
     if (!currentRoom || !currentUser) return;
-    try {
-      await submitDubitoVote(currentRoom.roomId, currentRoom, currentUser.uid, vote);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Errore durante la votazione');
-    }
+    const { dubitoState } = currentRoom;
+    // Il voto si riflette subito sui pulsanti (disabilitati), eliminando i doppi tap
+    // che con latenza elevata potevano risolvere due volte la stessa contestazione.
+    const statoOttimistico: RoomState | null = dubitoState
+      ? {
+          ...currentRoom,
+          dubitoState: {
+            ...dubitoState,
+            votes: { ...dubitoState.votes, [currentUser.uid]: vote },
+          },
+        }
+      : null;
+
+    await eseguiAzioneOttimistica(
+      `voto:${currentUser.uid}:${dubitoState?.move.timestamp ?? 0}`,
+      statoOttimistico,
+      () => submitDubitoVote(currentRoom.roomId, currentRoom, currentUser.uid, vote),
+      'Errore durante la votazione'
+    );
   };
 
   // Continue to next manche (or game over) from end-of-manche summary
   const handleContinueManche = async () => {
     if (!currentRoom || !currentUser) return;
-    try {
-      await continueFromMancheSummary(currentRoom.roomId, currentRoom, currentUser.uid);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Errore durante la continuazione della manche');
-    }
+    const detail = currentRoom.mancheDetail;
+    const statoOttimistico: RoomState | null = detail
+      ? {
+          ...currentRoom,
+          mancheDetail: {
+            ...detail,
+            readyPlayers: { ...detail.readyPlayers, [currentUser.uid]: true },
+          },
+        }
+      : null;
+
+    await eseguiAzioneOttimistica(
+      `manche:${currentUser.uid}:${detail?.mancheNumber ?? 0}`,
+      statoOttimistico,
+      () => continueFromMancheSummary(currentRoom.roomId, currentRoom, currentUser.uid),
+      'Errore durante la continuazione della manche'
+    );
   };
 
   // Automated Bot Move handler for bot turns
@@ -214,13 +303,13 @@ export default function App() {
       const board = currentRoom.board || [];
 
       // 1. Asso -> Ruspa sul tavolo
-      const ace = botHand.find((c) => c.value === 1);
+      const ace = botHand.find(c => c.value === 1);
       if (ace && board.length > 0) {
         const move: Move = {
           playerId: botId,
           playerName: botPlayer?.name || 'Giocatore 8',
           playedCard: ace,
-          targetCardIds: board.map((c) => c.id),
+          targetCardIds: board.map(c => c.id),
           isRuspa: true,
           isDiscardFaceUp: false,
           timestamp: Date.now(),
@@ -231,7 +320,7 @@ export default function App() {
 
       // 2. Presa Singola (Regola prioritaria ufficiale Scopa)
       for (const card of botHand) {
-        const matchingBoardCard = board.find((c) => c.value === card.value);
+        const matchingBoardCard = board.find(c => c.value === card.value);
         if (matchingBoardCard) {
           const isDeclaredScopa = board.length === 1;
           const move: Move = {
@@ -327,11 +416,9 @@ export default function App() {
     }
 
     const { dubitoState } = currentRoom;
-    const botIds = Object.keys(currentRoom.players).filter((id) => id.startsWith('bot_'));
+    const botIds = Object.keys(currentRoom.players).filter(id => id.startsWith('bot_'));
     const pendingBot = botIds.find(
-      (id) =>
-        currentRoom.players[id]?.team === dubitoState.targetTeam &&
-        !dubitoState.votes[id]
+      id => currentRoom.players[id]?.team === dubitoState.targetTeam && !dubitoState.votes[id]
     );
 
     if (!pendingBot) return;
@@ -361,7 +448,7 @@ export default function App() {
 
         await submitDubitoVote(currentRoom.roomId, currentRoom, pendingBot, botVote);
       } catch (err) {
-        console.warn('Bot vote error:', err);
+        registraAvviso('Bot vote error:', err);
       }
     }, 1500);
 
@@ -382,16 +469,30 @@ export default function App() {
     });
   }, [currentUser, playerName, currentRoom]);
 
+  // Prefetch del chunk del tavolo nei momenti di inattività: l'ingresso in partita
+  // non deve attendere il download su rete cellulare.
+  useEffect(() => {
+    const avviaPrefetch = () => {
+      void caricaGameBoard();
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(avviaPrefetch, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(avviaPrefetch, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Leave room
   const handleLeaveRoom = async () => {
     if (currentRoom && currentUser) {
       try {
         await leaveRoom(currentRoom.roomId, currentRoom, currentUser.uid);
       } catch (err) {
-        console.warn('Error leaving room:', err);
+        registraAvviso('Error leaving room:', err);
       }
     }
-    setCurrentRoom(null);
+    impostaStanzaConfermata(null);
   };
 
   // If player closes tab during active match, automatically conclude match
@@ -415,34 +516,34 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [currentRoom, currentUser]);
 
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-white border-t-transparent animate-spin" />
-          <span className="text-xs uppercase tracking-widest text-zinc-500">
-            Connessione a RUSPA...
-          </span>
-        </div>
+  const schermataCaricamento = (
+    <div className="h-[100dvh] w-full bg-black flex items-center justify-center text-white">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-full border-2 border-white border-t-transparent animate-spin" />
+        <span className="text-xs uppercase tracking-widest text-zinc-500">
+          Caricamento tavolo da gioco...
+        </span>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <>
-      {currentRoom && currentRoom.phase && currentRoom.phase !== 'LOBBY' && currentRoom.players ? (
-        <GameBoard
-          room={currentRoom}
-          currentUserId={currentUser.uid}
-          onPlayMove={handlePlayMove}
-          onDubitoVote={handleDubitoVote}
-          onContinueManche={handleContinueManche}
-          onLeaveRoom={handleLeaveRoom}
-        />
+      {currentUser && currentRoom?.phase && currentRoom.phase !== 'LOBBY' && currentRoom.players ? (
+        <Suspense fallback={schermataCaricamento}>
+          <GameBoard
+            room={currentRoom}
+            currentUserId={currentUser.uid}
+            onPlayMove={handlePlayMove}
+            onDubitoVote={handleDubitoVote}
+            onContinueManche={handleContinueManche}
+            onLeaveRoom={handleLeaveRoom}
+          />
+        </Suspense>
       ) : (
         <LobbyView
           currentRoom={currentRoom}
-          currentUser={currentUser}
+          currentUser={currentUser ?? UTENTE_IN_ATTESA}
           playerName={playerName}
           setPlayerName={handleUpdatePlayerName}
           playerEmoji={playerEmoji}
@@ -452,6 +553,7 @@ export default function App() {
           onStartMatch={handleStartMatch}
           onLeaveRoom={handleLeaveRoom}
           isLoading={isLoading}
+          isConnecting={!currentUser}
           errorMessage={errorMessage}
         />
       )}

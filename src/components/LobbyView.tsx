@@ -17,7 +17,15 @@ interface LobbyViewProps {
   onStartMatch: () => void;
   onLeaveRoom?: () => void;
   isLoading?: boolean;
+  /** Idratazione dell'identità in corso: la lobby è visibile ma le azioni di rete sono disabilitate. */
+  isConnecting?: boolean;
   errorMessage?: string | null;
+}
+
+function calcolaEtichettaCreaStanza(isConnecting: boolean, isLoading: boolean): string {
+  if (isConnecting) return 'Connessione in corso...';
+  if (isLoading) return 'Creazione stanza...';
+  return 'Crea Stanza Ora';
 }
 
 export const LobbyView: React.FC<LobbyViewProps> = ({
@@ -32,6 +40,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onStartMatch,
   onLeaveRoom,
   isLoading = false,
+  isConnecting = false,
   errorMessage = null,
 }) => {
   const [selectedMode, setSelectedMode] = useState<GameMode>('1v1');
@@ -54,8 +63,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   const handleAddBot = async () => {
     if (!currentRoom) return;
+    const botSuffisso =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().slice(0, 4)
+        : Date.now().toString(36).slice(-4);
     const botPlayer: Player = {
-      id: 'bot_8_' + Math.random().toString(36).substring(2, 6),
+      id: 'bot_8_' + botSuffisso,
       name: 'Giocatore 8',
       avatarSeed: '🤖',
       team: 2,
@@ -143,7 +156,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full justify-items-center">
-            {playersList.map((player) => (
+            {playersList.map(player => (
               <PlayerAvatar
                 key={player.id}
                 player={player}
@@ -213,7 +226,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           isOpen={isEmojiPickerOpen}
           onClose={() => setIsEmojiPickerOpen(false)}
           selectedEmoji={playerEmoji || '🥳'}
-          onSelectEmoji={(emoji) => setPlayerEmoji?.(emoji)}
+          onSelectEmoji={emoji => setPlayerEmoji?.(emoji)}
         />
       </div>
     );
@@ -279,7 +292,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <input
                 type="text"
                 value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
+                onChange={e => setPlayerName(e.target.value)}
                 maxLength={18}
                 placeholder="Inserisci il tuo nome..."
                 className="w-full bg-[#000000] border border-[#383838] rounded-2xl px-4 py-3 text-[#f2f2f2] placeholder-[#d9d9d9]/40 focus:outline-none focus:ring-2 focus:ring-[#e3e700] focus:border-[#e3e700] transition-all text-sm font-medium"
@@ -332,10 +345,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
           <button
             onClick={() => onCreateRoom(selectedMode)}
-            disabled={isLoading || !playerName.trim()}
+            disabled={isLoading || isConnecting || !playerName.trim()}
             className="w-full py-4 rounded-full bg-[#f2f2f2] text-[#000000] font-semibold text-sm hover:bg-[#e6e6e6] active:scale-98 transition-all shadow-lg disabled:opacity-40 cursor-pointer"
           >
-            {isLoading ? 'Creazione stanza...' : 'Crea Stanza Ora'}
+            {calcolaEtichettaCreaStanza(isConnecting, isLoading)}
           </button>
         </div>
 
@@ -348,14 +361,14 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <input
               type="text"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
               maxLength={8}
               placeholder="ES: RSP492"
               className="flex-1 bg-[#000000] border border-[#383838] rounded-2xl px-4 py-3 text-[#f2f2f2] uppercase tracking-widest font-mono placeholder-[#d9d9d9]/40 focus:outline-none focus:ring-2 focus:ring-[#e3e700] focus:border-[#e3e700] transition-all text-sm"
             />
             <button
               onClick={() => onJoinRoom(joinCode)}
-              disabled={isLoading || !joinCode.trim() || !playerName.trim()}
+              disabled={isLoading || isConnecting || !joinCode.trim() || !playerName.trim()}
               className="px-6 py-3 rounded-full bg-[#f2f2f2] text-[#000000] font-semibold text-sm hover:bg-[#e6e6e6] active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
             >
               Entra
@@ -368,7 +381,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         isOpen={isEmojiPickerOpen}
         onClose={() => setIsEmojiPickerOpen(false)}
         selectedEmoji={playerEmoji || '🥳'}
-        onSelectEmoji={(emoji) => setPlayerEmoji?.(emoji)}
+        onSelectEmoji={emoji => setPlayerEmoji?.(emoji)}
       />
     </div>
   );

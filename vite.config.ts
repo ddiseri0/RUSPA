@@ -32,7 +32,7 @@ function webMcpDevPlugin() {
           res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
             'Access-Control-Allow-Origin': '*',
           });
           res.write('\n');
@@ -115,9 +115,14 @@ function webMcpDevPlugin() {
                 const leavingPlayer = currentRoom.players[playerId];
                 if (currentRoom.phase !== 'LOBBY' && currentRoom.phase !== 'GAME_OVER') {
                   const winningTeam: 1 | 2 = leavingPlayer?.team === 1 ? 2 : 1;
-                  const winners = Object.values(currentRoom.players).filter((p: any) => p.team === winningTeam);
+                  const winners = Object.values(currentRoom.players).filter(
+                    (p: any) => p.team === winningTeam
+                  );
                   const winnerNames = winners.map((w: any) => w.name);
-                  const winnerScore = winners.reduce((acc: number, w: any) => acc + (w.score || 0), 0);
+                  const winnerScore = winners.reduce(
+                    (acc: number, w: any) => acc + (w.score || 0),
+                    0
+                  );
                   const leavingName = leavingPlayer?.name || 'Un giocatore';
 
                   const updatedRoom = {
@@ -178,7 +183,11 @@ function webMcpDevPlugin() {
               {
                 id: 2,
                 rule: 'Priorità Presa Singola Obbligatoria (presa a somma vietata se c’è la singola)',
-                input: { played: 'spade-7', targetSum: ['coppe-3', 'bastoni-4'], singlePresent: 'denari-7' },
+                input: {
+                  played: 'spade-7',
+                  targetSum: ['coppe-3', 'bastoni-4'],
+                  singlePresent: 'denari-7',
+                },
                 expected: { legalSumWithSinglePresent: false, singleMandatory: true },
                 passed: true,
               },
@@ -196,7 +205,11 @@ function webMcpDevPlugin() {
                   bluffAttempt: { played: 'spade-6', target: ['coppe-7'] },
                   honestMove: { played: 'spade-5', target: ['coppe-5'] },
                 },
-                expected: { challengerWinsBluff: true, moverWinsHonest: true, awardScopaPoint: true },
+                expected: {
+                  challengerWinsBluff: true,
+                  moverWinsHonest: true,
+                  awardScopaPoint: true,
+                },
                 passed: true,
               },
               {
@@ -209,7 +222,11 @@ function webMcpDevPlugin() {
               {
                 id: 6,
                 rule: 'Completamento Match fino a 40 carte e rimescolamento con 3+ Re a terra',
-                input: { initialKingsOnBoardMax: 2, completeAll40CardsBeforeWinnerCheck: true, victoryThreshold: 21 },
+                input: {
+                  initialKingsOnBoardMax: 2,
+                  completeAll40CardsBeforeWinnerCheck: true,
+                  victoryThreshold: 21,
+                },
                 expected: { reshuffleOn3PlusKings: true, matchCompletesAllCards: true },
                 passed: true,
               },
@@ -235,5 +252,31 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+  },
+  build: {
+    target: 'es2020',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('react') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('socket.io-client') || id.includes('engine.io-client')) {
+              return 'vendor-socket';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-lucide';
+            }
+            return 'vendor-libs';
+          }
+        },
+      },
+    },
   },
 });

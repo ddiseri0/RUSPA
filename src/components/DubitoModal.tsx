@@ -11,6 +11,12 @@ interface DubitoModalProps {
   onVote: (vote: 'DUBITO' | 'PASSA') => void;
 }
 
+function calcolaDimensioneCarta(conteggio: number): 'sm' | 'md' | 'lg' {
+  if (conteggio <= 2) return 'lg';
+  if (conteggio <= 3) return 'md';
+  return 'sm';
+}
+
 export const DubitoModal: React.FC<DubitoModalProps> = ({
   dubitoState,
   currentUserId,
@@ -28,11 +34,16 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
   const autoVotedRef = React.useRef(false);
 
   // Targeted cards from table
-  const targetedCards = dubitoState.move.isRuspa
-    ? boardCards
-    : boardCards.filter((c) => dubitoState.move.targetCardIds.includes(c.id));
+  const targetedCards = React.useMemo(() => {
+    return dubitoState.move.isRuspa
+      ? boardCards
+      : boardCards.filter(c => dubitoState.move.targetCardIds.includes(c.id));
+  }, [dubitoState.move.isRuspa, dubitoState.move.targetCardIds, boardCards]);
 
-  const cardsSum = targetedCards.reduce((acc, c) => acc + c.value, 0);
+  const cardsSum = React.useMemo(
+    () => targetedCards.reduce((acc, c) => acc + c.value, 0),
+    [targetedCards]
+  );
 
   const isDeclaredScopa =
     Boolean(dubitoState.move.isDeclaredScopa) ||
@@ -53,7 +64,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
     autoVotedRef.current = false;
 
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
+      setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(interval);
           if (isOpponentRef.current && !userVoteRef.current && !autoVotedRef.current) {
@@ -69,8 +80,9 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
     return () => clearInterval(interval);
   }, [dubitoState.initiatorId, dubitoState.move?.timestamp]);
 
-  const opposingPlayers = Object.values(players).filter(
-    (p) => p.team === dubitoState.targetTeam
+  const opposingPlayers = React.useMemo(
+    () => Object.values(players).filter(p => p.team === dubitoState.targetTeam),
+    [players, dubitoState.targetTeam]
   );
 
   return (
@@ -110,10 +122,10 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
             {dubitoState.move.isRuspa
               ? 'Dichiara Ruspa: spazza tutte le carte a terra!'
               : isDeclaredScopa
-              ? `Dichiara Scopa prendendo tutte le ${targetedCards.length} carte a terra!`
-              : targetedCards.length === 1
-              ? 'Dichiara la presa di questa carta dal tavolo:'
-              : 'Dichiara la presa di queste carte dal tavolo:'}
+                ? `Dichiara Scopa prendendo tutte le ${targetedCards.length} carte a terra!`
+                : targetedCards.length === 1
+                  ? 'Dichiara la presa di questa carta dal tavolo:'
+                  : 'Dichiara la presa di queste carte dal tavolo:'}
           </p>
         </div>
 
@@ -132,14 +144,13 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
 
           <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap py-1">
             {targetedCards.length === 0 ? (
-              <span className="text-sm text-[#d9d9d9]/70 italic py-4">Nessuna carta a terra selezionata</span>
+              <span className="text-sm text-[#d9d9d9]/70 italic py-4">
+                Nessuna carta a terra selezionata
+              </span>
             ) : (
-              targetedCards.map((c) => (
+              targetedCards.map(c => (
                 <div key={c.id} className="relative transition-all duration-200 hover:scale-105">
-                  <CardView
-                    card={c}
-                    size={targetedCards.length <= 2 ? 'lg' : targetedCards.length <= 3 ? 'md' : 'sm'}
-                  />
+                  <CardView card={c} size={calcolaDimensioneCarta(targetedCards.length)} />
                 </div>
               ))
             )}
@@ -149,7 +160,7 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
         {/* 2v2 Team Voting status */}
         {mode === '2v2' && (
           <div className="w-full bg-[#000000]/50 rounded-xl p-2.5 my-3 flex items-center justify-around text-xs border border-[#383838]">
-            {opposingPlayers.map((p) => {
+            {opposingPlayers.map(p => {
               const vote = dubitoState.votes[p.id];
               return (
                 <div key={p.id} className="flex items-center gap-1.5">
@@ -159,8 +170,8 @@ export const DubitoModal: React.FC<DubitoModalProps> = ({
                       vote === 'DUBITO'
                         ? 'bg-[#000000] text-[#e3e700] border border-[#e3e700]'
                         : vote === 'PASSA'
-                        ? 'bg-[#262626] text-[#d9d9d9] border border-[#383838]'
-                        : 'bg-[#000000]/40 text-[#d9d9d9]/60 animate-pulse'
+                          ? 'bg-[#262626] text-[#d9d9d9] border border-[#383838]'
+                          : 'bg-[#000000]/40 text-[#d9d9d9]/60 animate-pulse'
                     }`}
                   >
                     {vote ? vote : 'Attesa...'}
