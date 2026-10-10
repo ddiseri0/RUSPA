@@ -63,8 +63,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   const handleAddBot = async () => {
     if (!currentRoom) return;
+    const botSuffisso =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().slice(0, 4)
+        : Date.now().toString(36).slice(-4);
     const botPlayer: Player = {
-      id: 'bot_8_' + Math.random().toString(36).substring(2, 6),
+      id: 'bot_8_' + botSuffisso,
       name: 'Giocatore 8',
       avatarSeed: '🤖',
       team: 2,

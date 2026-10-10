@@ -43,19 +43,6 @@ if (syncChannel) {
   };
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', e => {
-    if (e.key && e.key.startsWith('ruspa_room_') && e.newValue) {
-      try {
-        const room = JSON.parse(e.newValue) as RoomState;
-        localRooms.set(room.roomId, room);
-        localRooms.set(room.code, room);
-        notifyLocalListeners(room.roomId, room);
-      } catch {}
-    }
-  });
-}
-
 function notifyLocalListeners(roomId: string, room: RoomState) {
   const listeners = localListeners.get(roomId);
   if (listeners) {
@@ -79,21 +66,21 @@ function calcolaSquadra(modo: GameMode, posto: number): 1 | 2 {
 }
 
 function ottieniNumeroCasualeSicuro(massimoEscluso: number): number {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
     const array = new Uint32Array(1);
     crypto.getRandomValues(array);
     return array[0] % massimoEscluso;
   }
-  return Math.floor(Math.random() * massimoEscluso);
+  return Date.now() % massimoEscluso;
 }
 
 function ottieniFloatCasuale(): number {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
     const array = new Uint32Array(1);
     crypto.getRandomValues(array);
     return array[0] / (0xffffffff + 1);
   }
-  return Math.random();
+  return (Date.now() % 1000) / 1000;
 }
 
 function saveLocalRoom(roomId: string, code: string, room: RoomState) {
@@ -103,14 +90,6 @@ function saveLocalRoom(roomId: string, code: string, room: RoomState) {
 
   localRooms.set(safeRoomId, room);
   if (safeCode) localRooms.set(safeCode, room);
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      localStorage.setItem(`ruspa_room_${safeRoomId}`, JSON.stringify(room));
-      if (safeCode) {
-        localStorage.setItem(`ruspa_code_${safeCode}`, safeRoomId);
-      }
-    } catch {}
-  }
   syncChannel?.postMessage({ type: 'SYNC_ROOM', roomId: safeRoomId, room });
   notifyLocalListeners(safeRoomId, room);
 }
@@ -122,21 +101,6 @@ function getLocalRoom(codeOrId: string): RoomState | null {
   if (localRooms.has(clean)) return localRooms.get(clean)!;
   if (localRooms.has('room_' + clean.toLowerCase()))
     return localRooms.get('room_' + clean.toLowerCase())!;
-
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const mappedId = sanificaIdStanza(localStorage.getItem(`ruspa_code_${clean}`) || '');
-      const raw =
-        localStorage.getItem(`ruspa_room_${mappedId || clean}`) ||
-        localStorage.getItem(`ruspa_room_room_${clean.toLowerCase()}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as RoomState;
-        localRooms.set(parsed.roomId, parsed);
-        localRooms.set(parsed.code, parsed);
-        return parsed;
-      }
-    } catch {}
-  }
   return null;
 }
 
