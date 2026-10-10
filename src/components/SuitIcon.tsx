@@ -6,7 +6,7 @@ interface SuitIconProps {
   className?: string;
 }
 
-export const SuitIcon: React.FC<SuitIconProps> = ({ suit, className = 'w-5 h-5' }) => {
+export const SuitIcon: React.FC<SuitIconProps> = React.memo(({ suit, className = 'w-5 h-5' }) => {
   switch (suit) {
     case 'denari':
       // Monetina Denari: Concentric rings and central dot (matching reference screenshot)
@@ -34,22 +34,13 @@ export const SuitIcon: React.FC<SuitIconProps> = ({ suit, className = 'w-5 h-5' 
           className={`inline-block select-none shrink-0 ${className}`}
         >
           {/* Chalice bowl with flat top */}
-          <path
-            d="M3.5 3.5h17v4c0 4.2-3.6 7.5-8.5 7.5s-8.5-3.3-8.5-7.5v-4z"
-            fill="#DC2626"
-          />
+          <path d="M3.5 3.5h17v4c0 4.2-3.6 7.5-8.5 7.5s-8.5-3.3-8.5-7.5v-4z" fill="#DC2626" />
           {/* Highlight lip */}
-          <path
-            d="M4.5 4.5h15v1.2H4.5z"
-            fill="#EF4444"
-          />
+          <path d="M4.5 4.5h15v1.2H4.5z" fill="#EF4444" />
           {/* Stem */}
           <rect x="10.5" y="14" width="3" height="4.5" fill="#B91C1C" />
           {/* Base */}
-          <path
-            d="M6 18.5h12v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2z"
-            fill="#991B1B"
-          />
+          <path d="M6 18.5h12v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2z" fill="#991B1B" />
         </svg>
       );
 
@@ -67,15 +58,9 @@ export const SuitIcon: React.FC<SuitIconProps> = ({ suit, className = 'w-5 h-5' 
             fill="#78350F"
           />
           {/* Left branch knot */}
-          <path
-            d="M9.5 8c-2.4 0-3.6 1.5-3.6 2.5s1.4 2 3.6 1.2V8z"
-            fill="#78350F"
-          />
+          <path d="M9.5 8c-2.4 0-3.6 1.5-3.6 2.5s1.4 2 3.6 1.2V8z" fill="#78350F" />
           {/* Right branch knot */}
-          <path
-            d="M14 13c2.4 0 3.6 1.4 3.6 2.4s-1.4 2-3.6 1.2v-3.6z"
-            fill="#78350F"
-          />
+          <path d="M14 13c2.4 0 3.6 1.4 3.6 2.4s-1.4 2-3.6 1.2v-3.6z" fill="#78350F" />
         </svg>
       );
 
@@ -98,4 +83,4 @@ export const SuitIcon: React.FC<SuitIconProps> = ({ suit, className = 'w-5 h-5' 
         </svg>
       );
   }
-};
+});

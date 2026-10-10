@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { RoomState, Card, Move } from '../types/game';
 import { CardView } from './CardView';
 import { CardBack } from './CardBack';
@@ -48,34 +48,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const userHand = room.privateHands?.[currentUserId] || [];
   const isMyTurn = room.currentTurnPlayerId === currentUserId && room.phase === 'PLAYER_TURN';
 
-  const currentSelectedSum = selectedBoardCards.reduce((acc, c) => acc + c.value, 0);
+  const currentSelectedSum = useMemo(
+    () => selectedBoardCards.reduce((acc, c) => acc + c.value, 0),
+    [selectedBoardCards]
+  );
 
   // Toggle selection of target cards on the board (somma max 10)
-  const toggleBoardCard = (card: Card) => {
-    if (!isMyTurn) return;
-    const isAlreadySelected = selectedBoardCards.some((c) => c.id === card.id);
-    if (isAlreadySelected) {
-      setSelectedBoardCards(selectedBoardCards.filter((c) => c.id !== card.id));
-    } else {
-      // In Scopa la somma delle carte prese da terra non può mai superare 10
-      const currentSum = selectedBoardCards.reduce((acc, c) => acc + c.value, 0);
-      if (currentSum + card.value > 10) {
-        return;
-      }
-      setSelectedBoardCards([...selectedBoardCards, card]);
-    }
-  };
+  const toggleBoardCard = useCallback(
+    (card: Card) => {
+      if (!isMyTurn) return;
+      setSelectedBoardCards(prev => {
+        const isAlreadySelected = prev.some(c => c.id === card.id);
+        if (isAlreadySelected) {
+          return prev.filter(c => c.id !== card.id);
+        }
+        // In Scopa la somma delle carte prese da terra non può mai superare 10
+        const currentSum = prev.reduce((acc, c) => acc + c.value, 0);
+        if (currentSum + card.value > 10) {
+          return prev;
+        }
+        return [...prev, card];
+      });
+    },
+    [isMyTurn]
+  );
 
   const isAce = selectedHandCard?.value === 1;
 
   // 1. Gioca Ruspa (Asso o Bluff diretto senza conferme)
-  const handlePlayRuspa = () => {
+  const handlePlayRuspa = useCallback(() => {
     if (!selectedHandCard || !isMyTurn) return;
     const move: Move = {
       playerId: currentUserId,
       playerName: currentUser?.name || 'Giocatore',
       playedCard: selectedHandCard,
-      targetCardIds: room.board.map((c) => c.id),
+      targetCardIds: room.board.map(c => c.id),
       isRuspa: true,
       isDiscardFaceUp: false,
       timestamp: Date.now(),
@@ -83,17 +90,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onPlayMove(move);
     setSelectedHandCard(null);
     setSelectedBoardCards([]);
-  };
+  }, [selectedHandCard, isMyTurn, currentUserId, currentUser?.name, room.board, onPlayMove]);
 
   // 2. Gioca Presa (Normale o Dichiara Scopa)
-  const handlePlayCapture = () => {
+  const handlePlayCapture = useCallback(() => {
     if (!selectedHandCard || !isMyTurn || selectedBoardCards.length === 0) return;
 
     const isDeclaredScopa =
       room.board.length > 0 && selectedBoardCards.length === room.board.length;
 
     // Regola Ufficiale: Priorità Presa Singola per prese parziali
-    const cartaSingolaPresente = room.board.some((c) => c.value === selectedHandCard.value);
+    const cartaSingolaPresente = room.board.some(c => c.value === selectedHandCard.value);
     if (!isDeclaredScopa && cartaSingolaPresente && selectedBoardCards.length > 1) {
       alert(
         `Regola Ufficiale: È presente a terra una carta di valore ${selectedHandCard.value} (${getCardLabel(
@@ -107,7 +114,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       playerId: currentUserId,
       playerName: currentUser?.name || 'Giocatore',
       playedCard: selectedHandCard,
-      targetCardIds: selectedBoardCards.map((c) => c.id),
+      targetCardIds: selectedBoardCards.map(c => c.id),
       isRuspa: false,
       isDiscardFaceUp: false,
       isDeclaredScopa,
@@ -116,10 +123,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onPlayMove(move);
     setSelectedHandCard(null);
     setSelectedBoardCards([]);
-  };
+  }, [
+    selectedHandCard,
+    isMyTurn,
+    selectedBoardCards,
+    room.board,
+    currentUserId,
+    currentUser?.name,
+    onPlayMove,
+  ]);
 
   // 3. Scarta a terra (scoperta)
-  const handlePlayDiscard = () => {
+  const handlePlayDiscard = useCallback(() => {
     if (!selectedHandCard || !isMyTurn) return;
     const move: Move = {
       playerId: currentUserId,
@@ -133,10 +148,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onPlayMove(move);
     setSelectedHandCard(null);
     setSelectedBoardCards([]);
-  };
+  }, [selectedHandCard, isMyTurn, currentUserId, currentUser?.name, onPlayMove]);
 
   // Opponent player for top pill
-  const otherPlayers = Object.values(room.players).filter((p) => p.id !== currentUserId);
+  const otherPlayers = useMemo(
+    () => Object.values(room.players).filter(p => p.id !== currentUserId),
+    [room.players, currentUserId]
+  );
   const primaryOpponent = otherPlayers[0] || {
     id: 'opp_8',
     name: 'Giocatore 8',
@@ -156,19 +174,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full bg-[#000000] text-[#f2f2f2] flex flex-col justify-between p-3 sm:p-5 md:p-6 select-none overflow-hidden font-sans">
-      
       {/* TOP SECTION: Responsive Header & Opponent Card */}
       <div className="w-full max-w-4xl mx-auto flex flex-col shrink-0">
-        
         {/* Navigation Header */}
         <div className="w-full flex items-center justify-between px-1 py-1">
           {/* Back Button `<` */}
           <button
             onClick={() => {
               if (room.phase !== 'GAME_OVER') {
-                const confirmLeave = window.confirm(
-                  'Sei sicuro di voler abbandonare la partita?'
-                );
+                const confirmLeave = window.confirm('Sei sicuro di voler abbandonare la partita?');
                 if (!confirmLeave) return;
               }
               onLeaveRoom();
@@ -235,9 +249,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               Tavolo vuoto
             </div>
           ) : (
-            room.board.map((card) => {
-              const isTargeted = selectedBoardCards.some((c) => c.id === card.id);
-              const exceedsTenIfAdded = !isTargeted && (currentSelectedSum + card.value > 10);
+            room.board.map(card => {
+              const isTargeted = selectedBoardCards.some(c => c.id === card.id);
+              const exceedsTenIfAdded = !isTargeted && currentSelectedSum + card.value > 10;
 
               return (
                 <div key={card.id} className="relative transition-all duration-200">
@@ -255,18 +269,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
 
         {/* Status Pill: "• Tocca a te · Scegli una carta" */}
-        <div className={`mt-4 sm:mt-5 px-4 sm:px-5 py-1.5 rounded-full bg-[#262626] border flex items-center justify-center shadow-sm select-none ${isMyTurn ? 'border-[#e3e700] ring-1 ring-[#e3e700]/50' : 'border-[#383838]'}`}>
+        <div
+          className={`mt-4 sm:mt-5 px-4 sm:px-5 py-1.5 rounded-full bg-[#262626] border flex items-center justify-center shadow-sm select-none ${isMyTurn ? 'border-[#e3e700] ring-1 ring-[#e3e700]/50' : 'border-[#383838]'}`}
+        >
           <span className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#f2f2f2] tracking-wide">
-            <span className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-[#e3e700] animate-pulse shadow-[0_0_8px_#e3e700]' : 'bg-[#d9d9d9]/60'}`}></span>
-            <span>{isMyTurn ? 'Tocca a te · Scegli una carta' : `Turno di ${primaryOpponent.name} · In attesa`}</span>
+            <span
+              className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-[#e3e700] animate-pulse shadow-[0_0_8px_#e3e700]' : 'bg-[#d9d9d9]/60'}`}
+            ></span>
+            <span>
+              {isMyTurn
+                ? 'Tocca a te · Scegli una carta'
+                : `Turno di ${primaryOpponent.name} · In attesa`}
+            </span>
           </span>
         </div>
       </div>
 
       {/* RIGA AZIONI DINAMICA: NESSUNA DUPLICAZIONE, SOLO LE AZIONI APPLICABILI */}
       <div className="w-full max-w-2xl mx-auto px-2 flex items-center justify-center gap-3 my-2 z-20 shrink-0 min-h-[48px]">
-        {hasSelectedCard && (
-          isAce ? (
+        {hasSelectedCard &&
+          (isAce ? (
             /* 1. SELEZIONATO UN ASSO: L'Asso può fare solo Ruspa. Unico pulsante presente! */
             <button
               onClick={handlePlayRuspa}
@@ -288,7 +310,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               onClick={handlePlayCapture}
               className="py-3 px-8 rounded-full font-bold text-xs sm:text-sm tracking-wide bg-[#e3e700] text-[#000000] hover:bg-[#d4d800] shadow-[0_0_20px_rgba(227,231,0,0.45)] active:scale-95 transition-all cursor-pointer"
             >
-              Prendi {selectedBoardCards.length > 1 ? `${selectedBoardCards.length} Carte` : 'Carta'}
+              Prendi{' '}
+              {selectedBoardCards.length > 1 ? `${selectedBoardCards.length} Carte` : 'Carta'}
             </button>
           ) : (
             /* 4. NESSUNA CARTA A TERRA SELEZIONATA: Scarta a terra oppure Bluffa Ruspa (esegue subito al click) */
@@ -306,13 +329,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 Bluffa Ruspa
               </button>
             </>
-          )
-        )}
+          ))}
       </div>
 
       {/* BOTTOM SECTION: MANO GIOCATORE (BOTTOM-LEFT) & CARD QUADRATA GIOCATORE 3 (BOTTOM-RIGHT) */}
       <footer className="w-full max-w-4xl mx-auto flex items-end justify-between px-1 pb-1 pt-1 gap-3 relative shrink-0">
-        
         {/* MANO DEL GIOCATORE (BOTTOM-LEFT, INGRANDITA FINO AL BORDO SINISTRO) */}
         <div className="flex-1 flex items-end -space-x-3 sm:-space-x-4 md:-space-x-2 overflow-visible pl-0.5">
           {userHand.map((card, idx) => {
@@ -423,7 +444,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 {room.winner?.winnerNames.join(' & ') || 'Vincitore'}
               </span>
               <span className="text-sm font-mono text-[#d9d9d9] mt-1">
-                Punteggio: <strong className="text-[#f2f2f2] text-base">{room.winner?.score || 0}</strong> pt
+                Punteggio:{' '}
+                <strong className="text-[#f2f2f2] text-base">{room.winner?.score || 0}</strong> pt
               </span>
             </div>
 
