@@ -17,6 +17,7 @@ Qualsiasi agente autonomo (AI), assistente o sviluppatore umano che interagisce 
   - Oggetti globali legati all'ambiente browser o Node (come `window`, `document`, `localStorage`).
 - **Immutabilità dello Stato di Gioco:** Le funzioni del motore non devono mai mutare gli oggetti passati come parametro (mazzi, mani, carte sul tavolo). Ogni calcolo o transizione di turno deve restituire nuove istanze immutabili o strutture clonate (pattern a funzioni pure).
 
+
 ### 1.2 ⚡ Dogma della Velocità e Reattività di Gioco (Performance-First & Network Resilience)
 
 - **Priorità Assoluta della Velocità di Gioco:** Qualsiasi implementazione, modifica architetturale o nuova funzionalità DEVE avere come priorità vincolante e non negoziabile la velocità di gioco e l'immediatezza della risposta al tocco dell'utente.
@@ -24,13 +25,13 @@ Qualsiasi agente autonomo (AI), assistente o sviluppatore umano che interagisce 
 - **Latenza Percepita Zero (Optimistic UI Obbligatoria):** Ogni interazione del giocatore (giocata della carta, dichiarazione, voto di Dubito) deve fornire un feedback visivo istantaneo sulla UI (entro il frame di rendering, `< 16ms`), senza mai attendere il round-trip del server o del database. L'eventuale rifiuto della mossa va gestito tramite riconciliazione e rollback asincrono senza bloccare il flusso.
 - **Tutela della Banda di Gioco:** La banda di rete deve essere riservata unicamente ai micro-payload essenziali dello stato di gioco. Nessun asset statico (grafiche delle carte, icone, suoni, stili, font) deve competere con i messaggi di partita in tempo reale, dovendo risiedere obbligatoriamente nella memoria cache locale del dispositivo.
 
----
 
 ## 2. 🇮🇹 Linee Guida di Nomenclatura e Tipizzazione
 
 La lingua ufficiale del dominio di business, dei modelli di dati e della logica applicativa è l'**italiano**.
 
 ### 2.1 Regole di Denominazione
+
 
 1. **Nomi di Tipi, Interfacce, Classi e Componenti (`PascalCase`):**
    - Utilizzare esclusivamente termini italiani corrispondenti al gioco.
